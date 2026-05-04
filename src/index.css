@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-on-background font-body-md antialiased overflow-hidden selection:bg-primary-container selection:text-on-primary-container;
+  }
+}
+
+@layer utilities {
+  .glass-effect {
+    background-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+  }
+
+  /* Ambient shadow for chat input */
+  .ambient-shadow {
+    box-shadow: 0 4px 20px rgba(115, 46, 228, 0.08);
+  }
+}
+
+/* Custom scrollbar for minimalism */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #dce1ff;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b6c4ff;
+}
