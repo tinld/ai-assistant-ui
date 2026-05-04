@@ -87,9 +87,20 @@ const chatSlice = createSlice({
       if (conv) {
         conv.messages.push(action.payload.message);
       }
+    },
+    createNewConversation: (state) => {
+      const newId = Date.now().toString();
+      state.conversations.unshift({
+        id: newId,
+        title: 'New Conversation',
+        updatedAt: 'Just now',
+        snippet: 'Start typing to begin...',
+        messages: []
+      });
+      state.activeConversationId = newId;
     }
   },
 });
 
-export const { setActiveConversation, addMessage } = chatSlice.actions;
+export const { setActiveConversation, addMessage, createNewConversation } = chatSlice.actions;
 export default chatSlice.reducer;
