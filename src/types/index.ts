@@ -1,10 +1,11 @@
 export interface Message {
-  id: string;
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: string;
+  timestamp?: string;
   files?: AttachedFile[];
   references?: string[];
+  type?: string;
 }
 
 export interface AttachedFile {
@@ -13,16 +14,8 @@ export interface AttachedFile {
   type: string;
 }
 
-export interface Conversation {
-  id: string;
-  title: string;
-  updatedAt: string;
-  snippet: string;
-  messages: Message[];
-}
-
 export interface ChatState {
-  conversations: Conversation[];
-  activeConversationId: string | null;
+  messages: Message[];
   isLoading: boolean;
+  error: string | null;
 }

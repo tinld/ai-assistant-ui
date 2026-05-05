@@ -11,7 +11,7 @@ import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-
+import { ProtectedRoute } from './components/layout/ProtectedRoute';
 function App() {
   const theme = useSelector((state: RootState) => state.app.theme);
 
@@ -33,13 +33,15 @@ function App() {
         </Route>
 
         {/* Main App Routes */}
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Navigate to="/chat" replace />} />
-          <Route path="chat" element={<Chat />} />
-          <Route path="knowledge-base" element={<KnowledgeBase />} />
-          <Route path="integrations" element={<Integrations />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="settings" element={<Settings />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<Navigate to="/chat" replace />} />
+            <Route path="chat" element={<Chat />} />
+            <Route path="knowledge-base" element={<KnowledgeBase />} />
+            <Route path="integrations" element={<Integrations />} />
+            <Route path="analytics" element={<Analytics />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
         </Route>
       </Routes>
     </Router>

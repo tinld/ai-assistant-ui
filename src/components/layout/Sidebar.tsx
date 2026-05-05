@@ -2,16 +2,14 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { toggleSidebar } from '../../store/appSlice';
-import { createNewConversation } from '../../store/chatSlice';
-import type { RootState } from '../../store';
+import type { RootState, AppDispatch } from '../../store';
 
 export const Sidebar: React.FC = () => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const isSidebarOpen = useSelector((state: RootState) => state.app.isSidebarOpen);
 
   const handleNewConversation = () => {
-    dispatch(createNewConversation());
     navigate('/chat');
   };
 
