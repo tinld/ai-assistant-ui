@@ -1,27 +1,93 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useSelector } from 'react-redux';
+import { knowledgeBaseApi } from '../services/kbApi';
+import { RootState } from '../store';
 
 interface Document {
   id: string;
   name: string;
-  type: 'pdf' | 'doc' | 'url' | 'csv';
+  type: string;
   size: string;
   uploadDate: string;
-  status: 'indexed' | 'processing' | 'failed';
+  status: 'indexed' | 'processing' | 'failed' | 'uploading';
+  progress?: number;
+  tags?: string[];
 }
 
-const MOCK_DOCUMENTS: Document[] = [
-  { id: '1', name: 'Q3_Financial_Report_2024.pdf', type: 'pdf', size: '2.4 MB', uploadDate: 'Oct 24, 2024', status: 'indexed' },
-  { id: '2', name: 'Employee_Handbook_v2.doc', type: 'doc', size: '1.1 MB', uploadDate: 'Oct 20, 2024', status: 'indexed' },
-  { id: '3', name: 'Customer_Feedback_Q3.csv', type: 'csv', size: '840 KB', uploadDate: 'Oct 26, 2024', status: 'processing' },
-  { id: '4', name: 'https://company-wiki.internal/marketing', type: 'url', size: '--', uploadDate: 'Oct 15, 2024', status: 'indexed' },
-  { id: '5', name: 'Competitor_Analysis.pdf', type: 'pdf', size: '4.2 MB', uploadDate: 'Oct 25, 2024', status: 'failed' },
-  { id: '6', name: 'API_Documentation_Draft.doc', type: 'doc', size: '3.5 MB', uploadDate: 'Oct 27, 2024', status: 'processing' },
-];
-
 export const KnowledgeBase: React.FC = () => {
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [filter, setFilter] = useState<string>('All');
   const [search, setSearch] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const token = useSelector((state: RootState) => state.auth.token);
+
+  const formatBytes = (bytes: number, decimals = 2) => {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+  };
+
+  const processFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setError(null);
+    
+    // Process first file (could be expanded to multiple later)
+    const file = files[0];
+    
+    // Validate size (50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      setError(`File "${file.name}" exceeds the 50MB limit.`);
+      return;
+    }
+
+    const newDocId = Math.random().toString(36).substr(2, 9);
+    const newDoc: Document = {
+      id: newDocId,
+      name: file.name,
+      type: file.name.split('.').pop()?.toLowerCase() || 'unknown',
+      size: formatBytes(file.size),
+      uploadDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      status: 'uploading',
+      progress: 0
+    };
+
+    setDocuments(prev => [newDoc, ...prev]);
+
+    knowledgeBaseApi.uploadDocument(file, token, (progress) => {
+      setDocuments(prev => prev.map(d => d.id === newDocId ? { ...d, progress } : d));
+    }).then((response: any) => {
+      // Simulate processing state before indexed
+      setDocuments(prev => prev.map(d => d.id === newDocId ? { ...d, status: 'processing', progress: undefined } : d));
+      setTimeout(() => {
+        const generatedTags = response?.data?.tags || ['General'];
+        setDocuments(prev => prev.map(d => d.id === newDocId ? { ...d, status: 'indexed', tags: generatedTags } : d));
+      }, 2000);
+    }).catch(() => {
+      setDocuments(prev => prev.map(d => d.id === newDocId ? { ...d, status: 'failed', progress: undefined } : d));
+      setError('Upload failed. Please try again.');
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    processFiles(e.dataTransfer.files);
+  };
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -41,12 +107,14 @@ export const KnowledgeBase: React.FC = () => {
         return <span className="px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-medium flex items-center gap-1"><span className="material-symbols-outlined text-[14px] animate-spin">sync</span> Processing</span>;
       case 'failed':
         return <span className="px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">error</span> Failed</span>;
+      case 'uploading':
+        return <span className="px-2 py-1 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 text-xs font-medium flex items-center gap-1"><span className="material-symbols-outlined text-[14px] animate-pulse">cloud_upload</span> Uploading</span>;
       default:
         return null;
     }
   };
 
-  const filteredDocs = MOCK_DOCUMENTS.filter(doc => {
+  const filteredDocs = documents.filter(doc => {
     if (filter !== 'All' && doc.type !== filter.toLowerCase()) return false;
     if (search && !doc.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -62,10 +130,20 @@ export const KnowledgeBase: React.FC = () => {
             <h1 className="text-3xl font-bold text-on-surface dark:text-slate-200">Knowledge Base</h1>
             <p className="text-on-surface-variant dark:text-slate-400 mt-1">Manage documents, URLs, and data sources for your AI Assistant's context.</p>
           </div>
-          <button className="flex items-center gap-2 bg-primary dark:bg-violet-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-violet-700 active:scale-95 transition-all shadow-sm">
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 bg-primary dark:bg-violet-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-violet-700 active:scale-95 transition-all shadow-sm"
+          >
             <span className="material-symbols-outlined text-sm">upload</span>
             Upload Files
           </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            hidden 
+            onChange={(e) => processFiles(e.target.files)} 
+            accept=".pdf,.doc,.docx,.csv,.txt"
+          />
         </div>
 
         {/* Stats Overview */}
@@ -103,22 +181,34 @@ export const KnowledgeBase: React.FC = () => {
         <div 
           className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-all duration-200 ${
             isDragging 
-              ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' 
+              ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 scale-[1.02]' 
               : 'border-outline-variant dark:border-slate-700 hover:border-violet-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
           }`}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => { e.preventDefault(); setIsDragging(false); }}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
-          <div className="w-16 h-16 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-full flex items-center justify-center mb-4">
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors ${isDragging ? 'bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'}`}>
             <span className="material-symbols-outlined text-3xl">cloud_upload</span>
           </div>
           <h3 className="text-lg font-bold text-on-surface dark:text-slate-200">Drag & drop files here</h3>
           <p className="text-on-surface-variant dark:text-slate-400 mt-1 mb-4 text-center max-w-md">
             Support PDF, DOCX, CSV, and TXT files up to 50MB each. Documents will be automatically indexed for AI retrieval.
           </p>
-          <button className="text-violet-600 dark:text-violet-400 font-medium hover:underline">Browse files from computer</button>
+          <button onClick={() => fileInputRef.current?.click()} className="text-violet-600 dark:text-violet-400 font-medium hover:underline cursor-pointer">Browse files from computer</button>
         </div>
+
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">error</span>
+              <span className="text-sm font-medium">{error}</span>
+            </div>
+            <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700 dark:hover:text-red-300">
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+        )}
 
         {/* Search and Filters */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-2">
@@ -170,17 +260,38 @@ export const KnowledgeBase: React.FC = () => {
               
               <h4 className="font-semibold text-on-surface dark:text-slate-200 line-clamp-1 mb-1" title={doc.name}>{doc.name}</h4>
               
-              <div className="flex items-center gap-3 text-xs text-on-surface-variant dark:text-slate-400 mb-4">
+              <div className="flex flex-wrap gap-1.5 mb-3 min-h-[20px]">
+                {doc.tags?.map((tag, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3 text-xs text-on-surface-variant dark:text-slate-400 mb-4 mt-auto">
                 <span>{doc.size}</span>
                 <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700"></span>
                 <span>{doc.uploadDate}</span>
               </div>
               
-              <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800/50 flex items-center justify-between">
-                {getStatusBadge(doc.status)}
-                
-                {doc.status === 'failed' && (
-                  <button className="text-xs text-red-600 dark:text-red-400 hover:underline font-medium">Retry</button>
+              <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800/50 flex flex-col gap-3">
+                {doc.status === 'uploading' && doc.progress !== undefined ? (
+                  <div className="w-full">
+                    <div className="flex justify-between text-xs mb-1 font-medium text-violet-700 dark:text-violet-400">
+                      <span>Uploading...</span>
+                      <span>{doc.progress}%</span>
+                    </div>
+                    <div className="w-full bg-violet-100 dark:bg-violet-900/30 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-violet-600 dark:bg-violet-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${doc.progress}%` }}></div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    {getStatusBadge(doc.status)}
+                    {doc.status === 'failed' && (
+                      <button className="text-xs text-red-600 dark:text-red-400 hover:underline font-medium">Retry</button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

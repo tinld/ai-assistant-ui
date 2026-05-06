@@ -11,6 +11,7 @@ export const Chat: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   
   const [inputValue, setInputValue] = useState('');
+  const [chatMode, setChatMode] = useState('auto');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -205,7 +206,27 @@ export const Chat: React.FC = () => {
               </div>
             )}
             <div className={`bg-surface-container-lowest dark:bg-slate-950 border border-outline-variant dark:border-slate-800 rounded-2xl p-2 flex flex-col ambient-shadow transition-all duration-300 focus-within:border-primary dark:focus-within:border-violet-500 focus-within:ring-1 focus-within:ring-primary dark:focus-within:ring-violet-500 ${isLoading ? 'opacity-70 pointer-events-none' : ''}`}>
-              <div className="flex items-end gap-2">
+              
+              {/* Context / Model Selector */}
+              <div className="flex items-center justify-between border-b border-outline-variant/30 dark:border-slate-800/50 pb-2 mb-1 px-2">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-slate-400 text-[16px]">tune</span>
+                  <select 
+                    value={chatMode}
+                    onChange={(e) => setChatMode(e.target.value)}
+                    className="bg-transparent text-xs font-semibold text-slate-600 dark:text-slate-300 focus:outline-none cursor-pointer hover:text-violet-600 transition-colors"
+                  >
+                    <option value="auto">✨ Auto-Classify (Magic)</option>
+                    <option value="general">🌍 General Web Search</option>
+                    <option value="private">🔒 Private Knowledge Base</option>
+                  </select>
+                </div>
+                {chatMode === 'private' && (
+                  <span className="text-[10px] bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">RAG Active</span>
+                )}
+              </div>
+
+              <div className="flex items-end gap-2 mt-1">
                 <button className="p-2 text-on-surface-variant dark:text-slate-400 hover:text-primary dark:hover:text-violet-400 hover:bg-surface-container dark:hover:bg-slate-800 rounded-full transition-colors flex-shrink-0 mb-1" title="Đính kèm tệp">
                   <span className="material-symbols-outlined">attach_file</span>
                 </button>

@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
 import { api, ApiError } from '../services/api';
-import { setCredentials } from '../store/authSlice';
 
 export const Register: React.FC = () => {
   const [fullName, setFullName] = useState('');
@@ -17,7 +15,6 @@ export const Register: React.FC = () => {
   const [touchedPassword, setTouchedPassword] = useState(false);
   const [touchedConfirm, setTouchedConfirm] = useState(false);
 
-  const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const validateEmail = (email: string) => {
