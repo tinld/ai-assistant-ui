@@ -1,10 +1,44 @@
-import React, { useState } from 'react';
-
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { api } from '../services/api';
+import type { RootState } from '../store';
 type Tab = 'Profile' | 'Appearance' | 'Integrations' | 'Billing';
 
 export const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('Integrations');
   const [isTabsCollapsed, setIsTabsCollapsed] = useState(false);
+
+  const token = useSelector((state: RootState) => state.auth.token);
+  const [useRagReranking, setUseRagReranking] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        if (!token) return;
+        const res = await api.get<{ data: { settings: { use_rag_reranking: boolean } } }>('/api/settings', token);
+        if (res?.data?.settings && typeof res.data.settings.use_rag_reranking === 'boolean') {
+          setUseRagReranking(res.data.settings.use_rag_reranking);
+        }
+      } catch (err) {
+        console.error("Failed to fetch settings", err);
+      }
+    };
+    fetchSettings();
+  }, [token]);
+
+  const handleSaveSettings = async () => {
+    try {
+      setIsSaving(true);
+      await api.put('/api/settings', { use_rag_reranking: useRagReranking }, token);
+      alert('Settings saved successfully!');
+    } catch (err) {
+      console.error("Failed to save settings", err);
+      alert('Failed to save settings');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Tab navigation items
   const tabs: { id: Tab; icon: string; label: string }[] = [
@@ -155,14 +189,47 @@ export const Settings: React.FC = () => {
 
                     </div>
                   </div>
+
+                  <div className="border-t border-outline-variant dark:border-slate-800/50 my-6"></div>
+
+                  {/* AI Configuration */}
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                        <span className="material-symbols-outlined text-[18px]">psychiatry</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-on-surface dark:text-slate-200">AI Configuration</h3>
+                    </div>
+                    
+                    <div className="flex flex-col gap-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Enable RAG Reranking</label>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Improves knowledge base retrieval quality using LLM-based reranking, which may slightly increase response time and cost.</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer" 
+                            checked={useRagReranking}
+                            onChange={(e) => setUseRagReranking(e.target.checked)}
+                          />
+                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300 dark:peer-focus:ring-violet-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-violet-600"></div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-8 pt-6 border-t border-outline-variant dark:border-slate-800 flex justify-end gap-4">
                   <button className="px-5 py-2.5 bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-semibold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                     Discard Changes
                   </button>
-                  <button className="px-5 py-2.5 bg-violet-600 text-white text-sm font-semibold rounded-lg hover:bg-violet-700 active:scale-95 transition-all shadow-sm">
-                    Save Configurations
+                  <button 
+                    onClick={handleSaveSettings}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 bg-violet-600 text-white text-sm font-semibold rounded-lg hover:bg-violet-700 active:scale-95 transition-all shadow-sm disabled:opacity-50">
+                    {isSaving ? 'Saving...' : 'Save Configurations'}
                   </button>
                 </div>
               </div>

@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { knowledgeBaseApi } from '../services/kbApi';
-import { RootState } from '../store';
+import type { RootState } from '../store';
+import { Navigate } from 'react-router-dom';
 
 interface Document {
   id: string;
@@ -20,8 +21,47 @@ export const KnowledgeBase: React.FC = () => {
   const [search, setSearch] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const token = useSelector((state: RootState) => state.auth.token);
+
+  useEffect(() => {
+    if (token) {
+      loadDocuments();
+    }
+  }, [token]);
+
+  const loadDocuments = async () => {
+    try {
+      setLoading(true);
+      const res = await knowledgeBaseApi.getDocuments(token);
+      if (res && res.data && res.data.documents) {
+        const loadedDocs: Document[] = res.data.documents.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          type: d.name.split('.').pop()?.toLowerCase() || 'unknown',
+          size: formatBytes(d.size),
+          uploadDate: new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          status: d.status,
+          tags: d.domain ? [d.domain] : ['General']
+        }));
+        // Remove currently successfully loaded ones from local mock state
+        setDocuments(prev => {
+          const uploadingDocs = prev.filter(p => p.status === 'uploading' || p.status === 'failed');
+          return [...uploadingDocs, ...loadedDocs];
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load knowledge base documents", err);
+      setError("Failed to load documents.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
 
   const formatBytes = (bytes: number, decimals = 2) => {
     if (!+bytes) return '0 Bytes';
@@ -60,13 +100,10 @@ export const KnowledgeBase: React.FC = () => {
 
     knowledgeBaseApi.uploadDocument(file, token, (progress) => {
       setDocuments(prev => prev.map(d => d.id === newDocId ? { ...d, progress } : d));
-    }).then((response: any) => {
-      // Simulate processing state before indexed
-      setDocuments(prev => prev.map(d => d.id === newDocId ? { ...d, status: 'processing', progress: undefined } : d));
-      setTimeout(() => {
-        const generatedTags = response?.data?.tags || ['General'];
-        setDocuments(prev => prev.map(d => d.id === newDocId ? { ...d, status: 'indexed', tags: generatedTags } : d));
-      }, 2000);
+    }).then(() => {
+      // Refresh documents from backend after upload completes
+      setDocuments(prev => prev.filter(d => d.id !== newDocId));
+      loadDocuments();
     }).catch(() => {
       setDocuments(prev => prev.map(d => d.id === newDocId ? { ...d, status: 'failed', progress: undefined } : d));
       setError('Upload failed. Please try again.');

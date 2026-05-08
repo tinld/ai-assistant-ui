@@ -22,9 +22,7 @@ export const knowledgeBaseApi = {
     formData.append('file', file);
     
     const config: any = {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: {},
       onUploadProgress: (progressEvent: any) => {
         if (progressEvent.total && onProgress) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -37,8 +35,19 @@ export const knowledgeBaseApi = {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
 
-    return axiosInstance.post('/rag/upload', formData, config);
+    return axiosInstance.post('/api/rag/upload', formData, config);
+  },
 
-
+  /**
+   * Get all uploaded documents for Knowledge Base
+   * @param token Auth token
+   */
+  getDocuments: async (token: string | null) => {
+    const config: any = { headers: {} };
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await axiosInstance.get('/api/rag/documents', config);
+    return response.data;
   },
 };
