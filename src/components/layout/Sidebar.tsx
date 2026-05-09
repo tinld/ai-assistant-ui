@@ -76,6 +76,21 @@ export const Sidebar: React.FC = () => {
         </NavLink>
         
         <NavLink
+          to="/files"
+          className={({ isActive }) =>
+            `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 ${
+              isActive
+                ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-r-4 border-violet-600'
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'
+            } ${isSidebarOpen ? 'gap-3' : 'justify-center'}`
+          }
+          title="File Manager"
+        >
+          <span className="material-symbols-outlined">folder</span>
+          {isSidebarOpen && <span className="whitespace-nowrap">File Manager</span>}
+        </NavLink>
+        
+        <NavLink
           to="/integrations"
           className={({ isActive }) =>
             `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 ${
@@ -111,10 +126,20 @@ export const Sidebar: React.FC = () => {
           <span className="material-symbols-outlined">help</span>
           {isSidebarOpen && <span>Help</span>}
         </a>
-        <a className={`flex items-center px-3 py-2.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all active:scale-95 duration-200 cursor-pointer ${isSidebarOpen ? 'gap-3' : 'justify-center'}`} title="Settings">
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 cursor-pointer ${
+              isActive
+                ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-r-4 border-violet-600'
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'
+            } ${isSidebarOpen ? 'gap-3' : 'justify-center'}`
+          }
+          title="Settings"
+        >
           <span className="material-symbols-outlined">settings</span>
           {isSidebarOpen && <span>Settings</span>}
-        </a>
+        </NavLink>
       </div>
     </aside>
   );
