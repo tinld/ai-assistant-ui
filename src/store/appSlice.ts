@@ -1,11 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import type { AppState } from '../types/app.types';
 
-export interface AppState {
-  isSidebarOpen: boolean;
-  isRecentConversationsOpen: boolean;
-  theme: 'light' | 'dark';
-}
 
 const initialState: AppState = {
   isSidebarOpen: true,

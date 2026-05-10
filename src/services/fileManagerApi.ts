@@ -1,24 +1,18 @@
 import axios from 'axios';
 import { API_URL, api } from './api';
+import type { FileItem } from '../types/file.types';
 
 const axiosInstance = axios.create({
   baseURL: API_URL,
-  timeout: 60000, 
+  timeout: 60000,
 });
 
-export interface FileItem {
-  id: string;
-  name: string;
-  size: number;
-  created_at: string;
-  in_kb?: boolean;
-}
 
 export const fileManagerApi = {
   uploadFile: async (file: File, token?: string | null, onProgress?: (progress: number) => void) => {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const config: any = {
       headers: {},
       onUploadProgress: (progressEvent: any) => {
@@ -37,11 +31,11 @@ export const fileManagerApi = {
     return response.data;
   },
 
-  getFiles: async (token?: string | null): Promise<{data: {files: FileItem[]}}> => {
-    return api.get<{data: {files: FileItem[]}}>('/api/files', token);
+  getFiles: async (token?: string | null): Promise<{ data: { files: FileItem[] } }> => {
+    return api.get<{ data: { files: FileItem[] } }>('/api/files', token);
   },
-  
+
   syncToKnowledgeBase: async (fileId: string, token?: string | null) => {
-    return api.post<{data: any}>('/api/files/sync_to_kb', { file_id: fileId }, token);
+    return api.post<{ data: any }>('/api/files/sync_to_kb', { file_id: fileId }, token);
   }
 };

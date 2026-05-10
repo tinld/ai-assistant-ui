@@ -1,17 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { User, AuthState } from '../types/auth.types';
 
-interface User {
-  id: string | number;
-  email: string;
-  full_name?: string;
-  [key: string]: any;
-}
-
-interface AuthState {
-  user: User | null;
-  token: string | null;
-  isAuthenticated: boolean;
-}
 
 // Check localStorage to initialize state if the user was already logged in
 const storedToken = localStorage.getItem('access_token');

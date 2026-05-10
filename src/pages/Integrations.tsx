@@ -1,15 +1,6 @@
 import React, { useState } from 'react';
 
-interface Integration {
-  id: string;
-  name: string;
-  description: string;
-  category: 'CRM' | 'Storage' | 'Communication' | 'Database' | 'API';
-  icon: string;
-  iconBgClass: string;
-  iconTextClass: string;
-  isConnected: boolean;
-}
+import type { Integration } from '../types/integration.types';
 
 const INITIAL_MOCK_DATA: Integration[] = [
   {

@@ -1,17 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import type { UploadTask, UploadState } from '../types/upload.types';
 
-export interface UploadTask {
-  id: string;
-  name: string;
-  progress: number;
-  status: 'uploading' | 'indexed' | 'failed';
-  size: number;
-}
-
-interface UploadState {
-  tasks: UploadTask[];
-}
 
 const initialState: UploadState = {
   tasks: [],

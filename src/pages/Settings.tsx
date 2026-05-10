@@ -10,15 +10,25 @@ export const Settings: React.FC = () => {
 
   const token = useSelector((state: RootState) => state.auth.token);
   const [useRagReranking, setUseRagReranking] = useState(true);
+  const [enablePromptLogging, setEnablePromptLogging] = useState(false);
+  const [telegramLogChatId, setTelegramLogChatId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         if (!token) return;
-        const res = await api.get<{ data: { settings: { use_rag_reranking: boolean } } }>('/api/settings', token);
-        if (res?.data?.settings && typeof res.data.settings.use_rag_reranking === 'boolean') {
-          setUseRagReranking(res.data.settings.use_rag_reranking);
+        const res = await api.get<{ data: { settings: { use_rag_reranking: boolean, enable_prompt_logging?: boolean, telegram_log_chat_id?: string } } }>('/api/settings', token);
+        if (res?.data?.settings) {
+          if (typeof res.data.settings.use_rag_reranking === 'boolean') {
+            setUseRagReranking(res.data.settings.use_rag_reranking);
+          }
+          if (typeof res.data.settings.enable_prompt_logging === 'boolean') {
+            setEnablePromptLogging(res.data.settings.enable_prompt_logging);
+          }
+          if (typeof res.data.settings.telegram_log_chat_id === 'string') {
+            setTelegramLogChatId(res.data.settings.telegram_log_chat_id);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch settings", err);
@@ -30,7 +40,11 @@ export const Settings: React.FC = () => {
   const handleSaveSettings = async () => {
     try {
       setIsSaving(true);
-      await api.put('/api/settings', { use_rag_reranking: useRagReranking }, token);
+      await api.put('/api/settings', { 
+        use_rag_reranking: useRagReranking,
+        enable_prompt_logging: enablePromptLogging,
+        telegram_log_chat_id: telegramLogChatId
+      }, token);
       alert('Settings saved successfully!');
     } catch (err) {
       console.error("Failed to save settings", err);
@@ -187,6 +201,47 @@ export const Settings: React.FC = () => {
                         </div>
                       </div>
 
+                    </div>
+                  </div>
+
+                  <div className="border-t border-outline-variant dark:border-slate-800/50 my-6"></div>
+
+                  {/* Telegram Prompt Logger */}
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                        <span className="material-symbols-outlined text-[18px]">send</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-on-surface dark:text-slate-200">Telegram Prompt Logger</h3>
+                    </div>
+                    
+                    <div className="flex flex-col gap-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Enable Prompt Logging</label>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Forwards exactly what is sent to the LLM (System Prompt + History + User input) to Telegram for debugging.</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer" 
+                            checked={enablePromptLogging}
+                            onChange={(e) => setEnablePromptLogging(e.target.checked)}
+                          />
+                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300 dark:peer-focus:ring-violet-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-violet-600"></div>
+                        </label>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Telegram Chat ID</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. 123456789"
+                          value={telegramLogChatId}
+                          onChange={(e) => setTelegramLogChatId(e.target.value)}
+                          className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-outline-variant dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 dark:text-slate-200"
+                        />
+                      </div>
                     </div>
                   </div>
 

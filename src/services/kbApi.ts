@@ -50,4 +50,47 @@ export const knowledgeBaseApi = {
     const response = await axiosInstance.get('/api/rag/documents', config);
     return response.data;
   },
+
+  /**
+   * Get all facts from the Knowledge Base
+   * @param token Auth token
+   * @param limit Limit for pagination (optional)
+   */
+  getFacts: async (token: string | null, limit: number = 50) => {
+    const config: any = { headers: {} };
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await axiosInstance.get(`/api/rag/facts?limit=${limit}`, config);
+    return response.data;
+  },
+
+  /**
+   * Update a fact in the Knowledge Base
+   * @param factId ID of the fact to update
+   * @param data Object containing updated text and domain
+   * @param token Auth token
+   */
+  updateFact: async (factId: string, data: { text: string; domain?: string }, token: string | null) => {
+    const config: any = { headers: {} };
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await axiosInstance.put(`/api/rag/facts/${factId}`, data, config);
+    return response.data;
+  },
+
+  /**
+   * Delete a fact from the Knowledge Base
+   * @param factId ID of the fact to delete
+   * @param token Auth token
+   */
+  deleteFact: async (factId: string, token: string | null) => {
+    const config: any = { headers: {} };
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await axiosInstance.delete(`/api/rag/facts/${factId}`, config);
+    return response.data;
+  },
 };

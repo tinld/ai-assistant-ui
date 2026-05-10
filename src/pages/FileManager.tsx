@@ -1,19 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { fileManagerApi, type FileItem } from '../services/fileManagerApi';
+import { fileManagerApi } from '../services/fileManagerApi';
 import type { RootState } from '../store';
 import { Navigate } from 'react-router-dom';
 import { addUploadTask, updateUploadProgress, updateUploadStatus } from '../store/uploadSlice';
-
-interface Document extends FileItem {
-  type: string;
-  status: 'indexed' | 'processing' | 'failed' | 'uploading';
-  progress?: number;
-  isSyncing?: boolean;
-}
+import type { FileManagerDocument } from '../types/file.types';
+import { formatBytes } from '../utils/formatters';
+import { getFileIcon } from '../utils/file.utils';
+import { StatusBadge } from '../components/StatusBadge';
 
 export const FileManager: React.FC = () => {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<FileManagerDocument[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -33,7 +30,7 @@ export const FileManager: React.FC = () => {
       setLoading(true);
       const res = await fileManagerApi.getFiles(token);
       if (res && res.data && res.data.files) {
-        const loadedDocs: Document[] = res.data.files.map(f => ({
+        const loadedDocs: FileManagerDocument[] = res.data.files.map(f => ({
           ...f,
           type: f.name.split('.').pop()?.toLowerCase() || 'unknown',
           status: 'indexed'
@@ -52,14 +49,7 @@ export const FileManager: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  const formatBytes = (bytes: number, decimals = 2) => {
-    if (!+bytes) return '0 Bytes';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-  };
+
 
   const processFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -129,28 +119,7 @@ export const FileManager: React.FC = () => {
     processFiles(e.dataTransfer.files);
   };
 
-  const getFileIcon = (type: string) => {
-    switch (type) {
-      case 'pdf': return 'picture_as_pdf';
-      case 'doc': case 'docx': return 'description';
-      case 'csv': return 'table_chart';
-      case 'png': case 'jpg': case 'jpeg': return 'image';
-      default: return 'insert_drive_file';
-    }
-  };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'indexed':
-        return <span className="px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">check_circle</span> Uploaded</span>;
-      case 'failed':
-        return <span className="px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-medium flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">error</span> Failed</span>;
-      case 'uploading':
-        return <span className="px-2 py-1 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 text-xs font-medium flex items-center gap-1"><span className="material-symbols-outlined text-[14px] animate-pulse">cloud_upload</span> Uploading</span>;
-      default:
-        return null;
-    }
-  };
 
   return (
     <div className="flex-1 bg-surface-bright dark:bg-slate-900 overflow-y-auto font-['Inter']">
@@ -214,7 +183,7 @@ export const FileManager: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {(() => {
             // Merge uploading tasks from Redux
-            const uploadingDocs: Document[] = uploadTasks
+            const uploadingDocs: FileManagerDocument[] = uploadTasks
               .filter(t => t.status === 'uploading' || t.status === 'failed')
               .map(t => ({
                 id: t.id,
@@ -282,7 +251,7 @@ export const FileManager: React.FC = () => {
                   </div>
                 ) : (
                   <div className="flex items-center justify-between">
-                    {getStatusBadge(doc.status)}
+                    <StatusBadge status={doc.status} isFileManager={true} />
                     {doc.status === 'failed' && (
                       <button className="text-xs text-red-600 dark:text-red-400 hover:underline font-medium">Retry</button>
                     )}

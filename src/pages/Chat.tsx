@@ -3,22 +3,39 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
 import { fetchHistory, sendMessage, clearChat, addLocalMessage } from '../store/chatSlice';
 import { toggleRecentConversations } from '../store/appSlice';
+import { api } from '../services/api';
 
 export const Chat: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { messages, isLoading } = useSelector((state: RootState) => state.chat);
   const isRecentConversationsOpen = useSelector((state: RootState) => state.app.isRecentConversationsOpen);
   const user = useSelector((state: RootState) => state.auth.user);
+  const token = useSelector((state: RootState) => state.auth.token);
   
   const [inputValue, setInputValue] = useState('');
   const [chatMode, setChatMode] = useState('auto');
+  const [isLoggingEnabled, setIsLoggingEnabled] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Fetch real history from backend on mount
     dispatch(fetchHistory());
-  }, [dispatch]);
+    
+    // Check if prompt logging is active
+    const checkSettings = async () => {
+      try {
+        if (!token) return;
+        const res = await api.get<{ data: { settings: { enable_prompt_logging?: boolean } } }>('/api/settings', token);
+        if (res?.data?.settings?.enable_prompt_logging) {
+          setIsLoggingEnabled(true);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    checkSettings();
+  }, [dispatch, token]);
 
   useEffect(() => {
     if (inputRef.current && !isLoading) {
@@ -221,9 +238,16 @@ export const Chat: React.FC = () => {
                     <option value="private">🔒 Private Knowledge Base</option>
                   </select>
                 </div>
-                {chatMode === 'private' && (
-                  <span className="text-[10px] bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">RAG Active</span>
-                )}
+                <div className="flex gap-2">
+                  {isLoggingEnabled && (
+                    <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Logs Active
+                    </span>
+                  )}
+                  {chatMode === 'private' && (
+                    <span className="text-[10px] bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">RAG Active</span>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-end gap-2 mt-1">
