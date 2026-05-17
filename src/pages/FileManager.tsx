@@ -25,7 +25,7 @@ export const FileManager: React.FC = () => {
     }
   }, [token]);
 
-  const loadFiles = async () => {
+  const loadFiles = async (): Promise<FileManagerDocument[]> => {
     try {
       setLoading(true);
       const res = await fileManagerApi.getFiles(token);
@@ -36,13 +36,16 @@ export const FileManager: React.FC = () => {
           status: 'indexed'
         }));
         setDocuments(loadedDocs);
+        return loadedDocs;
       }
     } catch (err) {
       console.error("Failed to load files", err);
       setError("Failed to load files.");
+      return [];
     } finally {
       setLoading(false);
     }
+    return [];
   };
 
   if (!token) {
@@ -78,7 +81,14 @@ export const FileManager: React.FC = () => {
       dispatch(updateUploadStatus({ id: tempId, status: 'indexed' }));
       // Refresh list to ensure we get the correct filename (e.g., test (1).pdf) from backend
       loadFiles();
-    }).catch(() => {
+    }).catch(async () => {
+      const refreshedDocs = await loadFiles();
+      const wasUploaded = refreshedDocs.some(doc => doc.name === file.name);
+      if (wasUploaded) {
+        dispatch(updateUploadStatus({ id: tempId, status: 'indexed' }));
+        return;
+      }
+
       dispatch(updateUploadStatus({ id: tempId, status: 'failed' }));
       setError('Upload failed. Please try again.');
     });
@@ -96,9 +106,17 @@ export const FileManager: React.FC = () => {
     try {
       await fileManagerApi.syncToKnowledgeBase(docId, token);
       setDocuments(prev => prev.map(d => d.id === docId ? { ...d, isSyncing: false, in_kb: true } : d));
+      loadFiles();
     } catch (err: any) {
       console.error(err);
-      setError(err.response?.data?.error || 'Failed to sync to Knowledge Base.');
+      const refreshedDocs = await loadFiles();
+      const refreshedDoc = refreshedDocs.find(d => d.id === docId);
+      if (refreshedDoc?.in_kb) {
+        setError(null);
+        return;
+      }
+
+      setError(err.response?.data?.error || 'Sync may still be finishing. Refreshed file status from server.');
       setDocuments(prev => prev.map(d => d.id === docId ? { ...d, isSyncing: false } : d));
     }
   };

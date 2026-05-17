@@ -35,7 +35,7 @@ export const KnowledgeBase: React.FC = () => {
     }
   }, [token]);
 
-  const loadDocuments = async () => {
+  const loadDocuments = async (): Promise<KBDocument[]> => {
     try {
       setLoading(true);
       const res = await knowledgeBaseApi.getDocuments(token);
@@ -50,16 +50,22 @@ export const KnowledgeBase: React.FC = () => {
           tags: d.domain ? [d.domain] : ['General']
         }));
         setDocuments(prev => {
-          const uploadingDocs = prev.filter(p => p.status === 'uploading' || p.status === 'failed');
-          return [...uploadingDocs, ...loadedDocs];
+          const loadedNames = new Set(loadedDocs.map(doc => doc.name));
+          const pendingDocs = prev.filter(p =>
+            (p.status === 'uploading' || p.status === 'failed') && !loadedNames.has(p.name)
+          );
+          return [...pendingDocs, ...loadedDocs];
         });
+        return loadedDocs;
       }
     } catch (err) {
       console.error("Failed to load knowledge base documents", err);
       setError("Failed to load documents.");
+      return [];
     } finally {
       setLoading(false);
     }
+    return [];
   };
 
   const loadFacts = async () => {
@@ -128,14 +134,22 @@ export const KnowledgeBase: React.FC = () => {
 
     setDocuments(prev => [newDoc, ...prev]);
 
+    const reconcileUpload = async (): Promise<boolean> => {
+      const loadedDocs = await loadDocuments();
+      return loadedDocs.some(doc => doc.name === file.name && doc.status === 'indexed');
+    };
+
     knowledgeBaseApi.uploadDocument(file, token, (progress) => {
       setDocuments(prev => prev.map(d => d.id === newDocId ? { ...d, progress } : d));
     }).then(() => {
       setDocuments(prev => prev.filter(d => d.id !== newDocId));
       loadDocuments();
-    }).catch(() => {
+    }).catch(async () => {
+      const wasIndexed = await reconcileUpload();
+      if (wasIndexed) return;
+
       setDocuments(prev => prev.map(d => d.id === newDocId ? { ...d, status: 'failed', progress: undefined } : d));
-      setError('Upload failed. Please try again.');
+      setError('Upload failed or timed out before indexing status returned. Please refresh documents before retrying.');
     });
   };
 

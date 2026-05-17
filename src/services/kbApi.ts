@@ -5,7 +5,7 @@ import { API_URL } from './api';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const axiosInstance = axios.create({
   baseURL: API_URL,
-  timeout: 60000, // 60 seconds timeout for large files
+  timeout: 300000, // Indexing can continue after upload reaches 100%
 });
 
 export const knowledgeBaseApi = {

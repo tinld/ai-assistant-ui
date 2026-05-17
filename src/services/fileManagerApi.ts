@@ -4,7 +4,7 @@ import type { FileItem } from '../types/file.types';
 
 const axiosInstance = axios.create({
   baseURL: API_URL,
-  timeout: 60000,
+  timeout: 300000,
 });
 
 
