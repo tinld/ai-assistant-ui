@@ -61,21 +61,6 @@ export const Sidebar: React.FC = () => {
         </NavLink>
         
         <NavLink
-          to="/knowledge-base"
-          className={({ isActive }) =>
-            `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 ${
-              isActive
-                ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-r-4 border-violet-600'
-                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'
-            } ${isSidebarOpen ? 'gap-3' : 'justify-center'}`
-          }
-          title="Knowledge Base"
-        >
-          <span className="material-symbols-outlined">database</span>
-          {isSidebarOpen && <span className="whitespace-nowrap">Knowledge Base</span>}
-        </NavLink>
-        
-        <NavLink
           to="/files"
           className={({ isActive }) =>
             `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 ${
@@ -84,7 +69,7 @@ export const Sidebar: React.FC = () => {
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'
             } ${isSidebarOpen ? 'gap-3' : 'justify-center'}`
           }
-          title="File Manager"
+          title="Intelligent File Manager"
         >
           <span className="material-symbols-outlined">folder</span>
           {isSidebarOpen && <span className="whitespace-nowrap">File Manager</span>}

@@ -5,7 +5,6 @@ import type { RootState } from './store';
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 import { Chat } from './pages/Chat';
-import { KnowledgeBase } from './pages/KnowledgeBase';
 import { FileManager } from './pages/FileManager';
 import { Integrations } from './pages/Integrations';
 import { Analytics } from './pages/Analytics';
@@ -38,7 +37,7 @@ function App() {
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Navigate to="/chat" replace />} />
             <Route path="chat" element={<Chat />} />
-            <Route path="knowledge-base" element={<KnowledgeBase />} />
+            <Route path="knowledge-base" element={<Navigate to="/files" replace />} />
             <Route path="files" element={<FileManager />} />
             <Route path="integrations" element={<Integrations />} />
             <Route path="analytics" element={<Analytics />} />

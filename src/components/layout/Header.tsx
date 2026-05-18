@@ -35,8 +35,10 @@ export const Header: React.FC = () => {
     switch (location.pathname) {
       case "/chat":
         return "Chat";
+      case "/files":
+        return "File Manager";
       case "/knowledge-base":
-        return "Knowledge Base";
+        return "File Manager";
       case "/integrations":
         return "Integrations";
       case "/analytics":
