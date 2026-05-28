@@ -19,3 +19,8 @@ export interface ChatState {
   isLoading: boolean;
   error: string | null;
 }
+
+export interface SendMessageInput {
+  messageContent: string;
+  agentId?: string;
+}

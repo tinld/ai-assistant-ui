@@ -1,6 +1,6 @@
-# AI Assistant UI
+# AI Concierge
 
-A modern, glassmorphism-styled React application for an AI assistant interface, built with Vite, TypeScript, and Tailwind CSS.
+A modern React application for an AI concierge experience, built with Vite, TypeScript, and Tailwind CSS.
 
 ## Features
 
@@ -35,8 +35,8 @@ A modern, glassmorphism-styled React application for an AI assistant interface, 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/tinld/ai-assistant-ui.git
-   cd ai-assistant-ui
+   git clone https://github.com/tinld/ai-concierge.git
+   cd ai-concierge
    ```
 
 2. Install dependencies:

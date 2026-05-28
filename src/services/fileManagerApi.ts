@@ -1,32 +1,27 @@
-import axios from 'axios';
-import { API_URL, api } from './api';
+import type { AxiosProgressEvent, AxiosRequestConfig } from 'axios';
+import { api, createApiAxiosInstance } from './api';
 import type { FileItem } from '../types/file.types';
 
-const axiosInstance = axios.create({
-  baseURL: API_URL,
-  timeout: 300000,
-});
+const axiosInstance = createApiAxiosInstance();
 
+const authHeaders = (token?: string | null): Record<string, string> => (
+  token ? { Authorization: `Bearer ${token}` } : {}
+);
 
 export const fileManagerApi = {
   uploadFile: async (file: File, token?: string | null, onProgress?: (progress: number) => void) => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const config: any = {
-      headers: {},
-      onUploadProgress: (progressEvent: any) => {
+    const config: AxiosRequestConfig = {
+      headers: authHeaders(token),
+      onUploadProgress: (progressEvent: AxiosProgressEvent) => {
         if (progressEvent.total && onProgress) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           onProgress(percentCompleted);
         }
       },
     };
-
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-
     const response = await axiosInstance.post('/api/files/upload', formData, config);
     return response.data;
   },
@@ -36,6 +31,6 @@ export const fileManagerApi = {
   },
 
   syncToKnowledgeBase: async (fileId: string, token?: string | null) => {
-    return api.post<{ data: any }>('/api/files/sync_to_kb', { file_id: fileId }, token);
+    return api.post<{ data: unknown }>('/api/files/sync_to_kb', { file_id: fileId }, token);
   }
 };

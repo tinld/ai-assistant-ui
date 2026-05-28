@@ -1,12 +1,11 @@
-import axios from 'axios';
-import { API_URL } from './api';
+import type { AxiosProgressEvent, AxiosRequestConfig } from 'axios';
+import { createApiAxiosInstance } from './api';
 
-// Create an Axios instance with base configuration
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const axiosInstance = axios.create({
-  baseURL: API_URL,
-  timeout: 300000, // Indexing can continue after upload reaches 100%
-});
+const axiosInstance = createApiAxiosInstance();
+
+const authHeaders = (token?: string | null): Record<string, string> => (
+  token ? { Authorization: `Bearer ${token}` } : {}
+);
 
 export const knowledgeBaseApi = {
   /**
@@ -16,25 +15,19 @@ export const knowledgeBaseApi = {
    * @param onProgress Callback function for upload progress (0 to 100)
    * @returns A promise that resolves to the server response
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   uploadDocument: async (file: File, token?: string | null, onProgress?: (progress: number) => void) => {
     const formData = new FormData();
     formData.append('file', file);
     
-    const config: any = {
-      headers: {},
-      onUploadProgress: (progressEvent: any) => {
+    const config: AxiosRequestConfig = {
+      headers: authHeaders(token),
+      onUploadProgress: (progressEvent: AxiosProgressEvent) => {
         if (progressEvent.total && onProgress) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           onProgress(percentCompleted);
         }
       },
     };
-
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-
     return axiosInstance.post('/api/rag/upload', formData, config);
   },
 
@@ -43,10 +36,7 @@ export const knowledgeBaseApi = {
    * @param token Auth token
    */
   getDocuments: async (token: string | null) => {
-    const config: any = { headers: {} };
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
+    const config: AxiosRequestConfig = { headers: authHeaders(token) };
     const response = await axiosInstance.get('/api/rag/documents', config);
     return response.data;
   },
@@ -57,10 +47,7 @@ export const knowledgeBaseApi = {
    * @param limit Limit for pagination (optional)
    */
   getFacts: async (token: string | null, limit: number = 50) => {
-    const config: any = { headers: {} };
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
+    const config: AxiosRequestConfig = { headers: authHeaders(token) };
     const response = await axiosInstance.get(`/api/rag/facts?limit=${limit}`, config);
     return response.data;
   },
@@ -72,10 +59,7 @@ export const knowledgeBaseApi = {
    * @param token Auth token
    */
   updateFact: async (factId: string, data: { text: string; domain?: string }, token: string | null) => {
-    const config: any = { headers: {} };
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
+    const config: AxiosRequestConfig = { headers: authHeaders(token) };
     const response = await axiosInstance.put(`/api/rag/facts/${factId}`, data, config);
     return response.data;
   },
@@ -86,10 +70,7 @@ export const knowledgeBaseApi = {
    * @param token Auth token
    */
   deleteFact: async (factId: string, token: string | null) => {
-    const config: any = { headers: {} };
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
+    const config: AxiosRequestConfig = { headers: authHeaders(token) };
     const response = await axiosInstance.delete(`/api/rag/facts/${factId}`, config);
     return response.data;
   },

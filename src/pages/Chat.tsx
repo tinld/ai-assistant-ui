@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
 import { fetchHistory, sendMessage, clearChat, addLocalMessage } from '../store/chatSlice';
 import { toggleRecentConversations } from '../store/appSlice';
 import { api } from '../services/api';
+import { agentApi } from '../services/agentApi';
+import type { AgentProfile } from '../types/agent.types';
 
 export const Chat: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -14,9 +16,15 @@ export const Chat: React.FC = () => {
   
   const [inputValue, setInputValue] = useState('');
   const [chatMode, setChatMode] = useState('auto');
+  const [agents, setAgents] = useState<AgentProfile[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [isLoggingEnabled, setIsLoggingEnabled] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const selectedAgent = useMemo(
+    () => agents.find((agent) => agent.agent_id === selectedAgentId) ?? null,
+    [agents, selectedAgentId]
+  );
 
   useEffect(() => {
     // Fetch real history from backend on mount
@@ -36,6 +44,22 @@ export const Chat: React.FC = () => {
     };
     checkSettings();
   }, [dispatch, token]);
+
+  useEffect(() => {
+    const loadAgents = async (): Promise<void> => {
+      try {
+        if (!token) return;
+        const loadedAgents = await agentApi.getAgents(token);
+        const activeAgent = loadedAgents.find((agent) => agent.is_active) ?? loadedAgents[0];
+        setAgents(loadedAgents);
+        setSelectedAgentId(activeAgent?.agent_id ?? '');
+      } catch (agentError) {
+        console.error(agentError);
+      }
+    };
+
+    void loadAgents();
+  }, [token]);
 
   useEffect(() => {
     if (inputRef.current && !isLoading) {
@@ -64,7 +88,10 @@ export const Chat: React.FC = () => {
     }));
 
     // Send to backend
-    dispatch(sendMessage(messageContent));
+    dispatch(sendMessage({
+      messageContent,
+      agentId: selectedAgentId || undefined,
+    }));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -146,6 +173,11 @@ export const Chat: React.FC = () => {
               <p className="text-on-surface-variant dark:text-slate-400 max-w-md">
                 Hệ thống AI đã sẵn sàng. Hãy bắt đầu trò chuyện bằng cách nhập tin nhắn bên dưới.
               </p>
+              {selectedAgent && (
+                <p className="mt-3 text-sm font-semibold text-violet-600 dark:text-violet-400">
+                  Chatting with {selectedAgent.name}
+                </p>
+              )}
             </div>
           ) : (
             <>
@@ -226,7 +258,26 @@ export const Chat: React.FC = () => {
               
               {/* Context / Model Selector */}
               <div className="flex items-center justify-between border-b border-outline-variant/30 dark:border-slate-800/50 pb-2 mb-1 px-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="material-symbols-outlined text-slate-400 text-[16px]">diversity_1</span>
+                    <select
+                      value={selectedAgentId}
+                      onChange={(e) => setSelectedAgentId(e.target.value)}
+                      className="max-w-40 bg-transparent text-xs font-semibold text-slate-600 dark:text-slate-300 focus:outline-none cursor-pointer hover:text-violet-600 transition-colors"
+                      title="AI Agent"
+                    >
+                      {agents.length === 0 ? (
+                        <option value="">Default Agent</option>
+                      ) : (
+                        agents.map((agent) => (
+                          <option key={agent.agent_id} value={agent.agent_id}>
+                            {agent.name}{agent.is_active ? ' (active)' : ''}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
                   <span className="material-symbols-outlined text-slate-400 text-[16px]">tune</span>
                   <select 
                     value={chatMode}
@@ -234,7 +285,7 @@ export const Chat: React.FC = () => {
                     className="bg-transparent text-xs font-semibold text-slate-600 dark:text-slate-300 focus:outline-none cursor-pointer hover:text-violet-600 transition-colors"
                   >
                     <option value="auto">✨ Auto-Classify (Magic)</option>
-                    <option value="general">🌍 General Web Search</option>
+                    <option value="general">Web Search</option>
                     <option value="private">🔒 Private Knowledge Base</option>
                   </select>
                 </div>
@@ -245,7 +296,7 @@ export const Chat: React.FC = () => {
                     </span>
                   )}
                   {chatMode === 'private' && (
-                    <span className="text-[10px] bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">RAG Active</span>
+                    <span className="text-[10px] bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Knowledge Active</span>
                   )}
                 </div>
               </div>

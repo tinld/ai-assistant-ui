@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { toggleSidebar } from '../../store/appSlice';
 import type { RootState, AppDispatch } from '../../store';
+import { APP_ROUTES } from '../../constants/route.constants';
 
 export const Sidebar: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -10,7 +11,7 @@ export const Sidebar: React.FC = () => {
   const isSidebarOpen = useSelector((state: RootState) => state.app.isSidebarOpen);
 
   const handleNewConversation = () => {
-    navigate('/chat');
+    navigate(APP_ROUTES.chat);
   };
 
   return (
@@ -46,7 +47,7 @@ export const Sidebar: React.FC = () => {
       
       <nav className="flex-1 flex flex-col gap-1">
         <NavLink
-          to="/chat"
+          to={APP_ROUTES.chat}
           className={({ isActive }) =>
             `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 ${
               isActive
@@ -61,7 +62,22 @@ export const Sidebar: React.FC = () => {
         </NavLink>
         
         <NavLink
-          to="/files"
+          to={APP_ROUTES.agents}
+          className={({ isActive }) =>
+            `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 ${
+              isActive
+                ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-r-4 border-violet-600'
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'
+            } ${isSidebarOpen ? 'gap-3' : 'justify-center'}`
+          }
+          title="AI Agents"
+        >
+          <span className="material-symbols-outlined">diversity_1</span>
+          {isSidebarOpen && <span className="whitespace-nowrap">AI Agents</span>}
+        </NavLink>
+
+        <NavLink
+          to={APP_ROUTES.files}
           className={({ isActive }) =>
             `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 ${
               isActive
@@ -76,7 +92,7 @@ export const Sidebar: React.FC = () => {
         </NavLink>
         
         <NavLink
-          to="/integrations"
+          to={APP_ROUTES.integrations}
           className={({ isActive }) =>
             `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 ${
               isActive
@@ -91,7 +107,7 @@ export const Sidebar: React.FC = () => {
         </NavLink>
         
         <NavLink
-          to="/analytics"
+          to={APP_ROUTES.analytics}
           className={({ isActive }) =>
             `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 ${
               isActive
@@ -112,7 +128,7 @@ export const Sidebar: React.FC = () => {
           {isSidebarOpen && <span>Help</span>}
         </a>
         <NavLink
-          to="/settings"
+          to={APP_ROUTES.settings}
           className={({ isActive }) =>
             `flex items-center px-3 py-2.5 rounded-lg font-semibold transition-all active:scale-95 duration-200 cursor-pointer ${
               isActive

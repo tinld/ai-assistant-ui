@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
-import { api, ApiError, API_URL } from '../services/api';
+import { api, ApiError } from '../services/api';
 import type { RootState } from './index';
-import type { ChatState, Message } from '../types';
+import type { ChatState, Message, SendMessageInput } from '../types/chat.types';
 
 const initialState: ChatState = {
   messages: [],
@@ -20,7 +20,7 @@ export const fetchHistory = createAsyncThunk(
     try {
       const response = await api.get<{ success: boolean; history: Message[] }>('/api/chat/history', token);
       return response.history;
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError) return rejectWithValue(err.message);
       return rejectWithValue('Failed to fetch history');
     }
@@ -29,15 +29,18 @@ export const fetchHistory = createAsyncThunk(
 
 export const sendMessage = createAsyncThunk(
   'chat/sendMessage',
-  async (messageContent: string, { getState, rejectWithValue }) => {
+  async (input: string | SendMessageInput, { getState, rejectWithValue }) => {
     const state = getState() as RootState;
     const token = state.auth.token;
     if (!token) return rejectWithValue('No token');
+    const messageContent = typeof input === 'string' ? input : input.messageContent;
+    const agentId = typeof input === 'string' ? undefined : input.agentId;
+    const requestBody = agentId ? { message: messageContent, agent_id: agentId } : { message: messageContent };
     
     try {
-      const response = await api.post<{ success: boolean; response: string; user_message: string }>('/api/chat', { message: messageContent }, token);
+      const response = await api.post<{ success: boolean; response: string; user_message: string }>('/api/chat', requestBody, token);
       return response;
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError) return rejectWithValue(err.message);
       return rejectWithValue('Failed to send message');
     }
@@ -52,15 +55,10 @@ export const clearChat = createAsyncThunk(
     if (!token) return rejectWithValue('No token');
     
     try {
-      const response = await fetch(`${API_URL}/api/chat/history`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (!response.ok) throw new Error('Failed to clear chat');
+      await api.delete<{ success: boolean }>('/api/chat/history', token);
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      if (err instanceof ApiError) return rejectWithValue(err.message);
       return rejectWithValue('Failed to clear chat');
     }
   }

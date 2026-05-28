@@ -10,6 +10,7 @@ const initialState: AuthState = {
   user: storedUser ? JSON.parse(storedUser) : null,
   token: storedToken,
   isAuthenticated: !!storedToken,
+  authNotice: null,
 };
 
 const authSlice = createSlice({
@@ -23,6 +24,7 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.token = action.payload.access_token;
       state.isAuthenticated = true;
+      state.authNotice = null;
       // Store in localStorage for persistence across reloads
       localStorage.setItem('access_token', action.payload.access_token);
       localStorage.setItem('user', JSON.stringify(action.payload.user));
@@ -31,11 +33,23 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
+      state.authNotice = null;
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
+    },
+    logoutWithNotice: (state, action: PayloadAction<string>) => {
+      state.user = null;
+      state.token = null;
+      state.isAuthenticated = false;
+      state.authNotice = action.payload;
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+    },
+    clearAuthNotice: (state) => {
+      state.authNotice = null;
     },
   },
 });
 
-export const { setCredentials, logout } = authSlice.actions;
+export const { setCredentials, logout, logoutWithNotice, clearAuthNotice } = authSlice.actions;
 export default authSlice.reducer;

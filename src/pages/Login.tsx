@@ -1,25 +1,29 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { api, ApiError } from '../services/api';
-import { setCredentials } from '../store/authSlice';
+import { clearAuthNotice, setCredentials } from '../store/authSlice';
+import type { RootState } from '../store';
+import type { User } from '../types/auth.types';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const authNotice = useSelector((state: RootState) => state.auth.authNotice);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    dispatch(clearAuthNotice());
     setError(null);
     setIsLoading(true);
 
     try {
-      const response = await api.post<{ success: boolean; access_token: string; refresh_token?: string; user: any }>('/api/auth/login', {
+      const response = await api.post<{ success: boolean; access_token: string; refresh_token?: string; user?: User }>('/api/auth/login', {
         email,
         password,
       });
@@ -33,7 +37,7 @@ export const Login: React.FC = () => {
       } else {
         setError('Login failed. Please check your credentials.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError) {
         setError(err.message || 'Invalid email or password.');
       } else {
@@ -51,10 +55,10 @@ export const Login: React.FC = () => {
         <p className="text-sm text-slate-500 dark:text-slate-400">Sign in to continue to your AI assistant</p>
       </div>
 
-      {error && (
+      {(error || authNotice) && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm flex items-center gap-2 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400">
           <span className="material-symbols-outlined text-base">error</span>
-          <span>{error}</span>
+          <span>{error || authNotice}</span>
         </div>
       )}
 

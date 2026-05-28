@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { toggleTheme } from "../../store/appSlice";
 import type { RootState } from "../../store";
+import { APP_ROUTES } from "../../constants/route.constants";
 
 export const Header: React.FC = () => {
   const location = useLocation();
@@ -31,18 +32,22 @@ export const Header: React.FC = () => {
     };
   }, []);
 
-  const getPageTitle = () => {
+  const getPageTitle = (): string => {
     switch (location.pathname) {
-      case "/chat":
+      case APP_ROUTES.chat:
         return "Chat";
-      case "/files":
+      case APP_ROUTES.files:
         return "File Manager";
       case "/knowledge-base":
         return "File Manager";
-      case "/integrations":
+      case APP_ROUTES.agents:
+        return "AI Agents";
+      case APP_ROUTES.integrations:
         return "Integrations";
-      case "/analytics":
+      case APP_ROUTES.analytics:
         return "Analytics";
+      case APP_ROUTES.settings:
+        return "Settings";
       default:
         return "Dashboard";
     }
