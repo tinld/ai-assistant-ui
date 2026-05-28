@@ -226,6 +226,14 @@ export const Agents: React.FC = () => {
             </p>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={handleCreateNew}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-violet-700 active:translate-y-0"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Create Agent
+          </button>
         </div>
 
         {error && (
@@ -259,6 +267,23 @@ export const Agents: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={handleCreateNew}
+                  className="agent-card-enter agent-card-hover rounded-lg border border-dashed border-violet-300 bg-violet-50/70 p-5 text-left shadow-sm hover:border-violet-500 dark:border-violet-800 dark:bg-violet-950/20 dark:hover:border-violet-600"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white">
+                      <span className="material-symbols-outlined text-[20px]">add</span>
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Create Agent</h2>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Open the same guided setup flow to define a new agent.
+                      </p>
+                    </div>
+                  </div>
+                </button>
                 {agents.map((agent, index) => (
                   <button
                     key={agent.agent_id}

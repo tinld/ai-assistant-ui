@@ -30,6 +30,14 @@ export const fileManagerApi = {
     return api.get<{ data: { files: FileItem[] } }>('/api/files', token);
   },
 
+  updateFile: async (fileId: string, name: string, token?: string | null) => {
+    return api.put<{ data: { file_id: string; name: string } }>(`/api/files/${fileId}`, { name }, token);
+  },
+
+  deleteFile: async (fileId: string, token?: string | null) => {
+    return api.delete<{ message: string }>(`/api/files/${fileId}`, token);
+  },
+
   syncToKnowledgeBase: async (fileId: string, token?: string | null) => {
     return api.post<{ data: unknown }>('/api/files/sync_to_kb', { file_id: fileId }, token);
   }

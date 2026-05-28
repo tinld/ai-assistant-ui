@@ -1,5 +1,7 @@
 export interface KBDocument {
   id: string;
+  documentId?: string;
+  kbDocumentId?: string;
   name: string;
   type: string;
   size: string;
@@ -7,6 +9,8 @@ export interface KBDocument {
   status: 'indexed' | 'processing' | 'failed' | 'uploading';
   progress?: number;
   tags?: string[];
+  searchEnabled?: boolean;
+  isTogglingSearch?: boolean;
 }
 
 export interface Fact {
