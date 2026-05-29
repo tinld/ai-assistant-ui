@@ -27,7 +27,12 @@ export const fileManagerApi = {
   },
 
   getFiles: async (token?: string | null): Promise<{ data: { files: FileItem[] } }> => {
-    return api.get<{ data: { files: FileItem[] } }>('/api/files', token);
+    const response = await api.get<{ data?: { files?: FileItem[] }; files?: FileItem[] }>('/api/files', token);
+    return {
+      data: {
+        files: response.data?.files ?? response.files ?? [],
+      },
+    };
   },
 
   updateFile: async (fileId: string, name: string, token?: string | null) => {
@@ -39,6 +44,6 @@ export const fileManagerApi = {
   },
 
   syncToKnowledgeBase: async (fileId: string, token?: string | null) => {
-    return api.post<{ data: unknown }>('/api/files/sync_to_kb', { file_id: fileId }, token);
+    return api.post<{ document_id?: string; search_enabled?: boolean; file?: FileItem }>('/api/files/sync_to_kb', { file_id: fileId }, token);
   }
 };

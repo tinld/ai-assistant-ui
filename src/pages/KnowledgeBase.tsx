@@ -6,6 +6,7 @@ import type { KBDocument, Fact } from '../types/knowledge-base.types';
 import { formatBytes } from '../utils/formatters';
 import { getFileIcon } from '../utils/file.utils';
 import { StatusBadge } from '../components/StatusBadge';
+import { NotificationToast, type NotificationToastData } from '../components/NotificationToast';
 import { Navigate } from 'react-router-dom';
 
 export const KnowledgeBase: React.FC = () => {
@@ -16,7 +17,7 @@ export const KnowledgeBase: React.FC = () => {
   const [search, setSearch] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [toast, setToast] = useState<NotificationToastData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const togglingDocumentIdsRef = useRef<Set<string>>(new Set());
@@ -48,7 +49,7 @@ export const KnowledgeBase: React.FC = () => {
       if (res && res.data && res.data.documents) {
         const loadedDocs: KBDocument[] = res.data.documents.map((d: any) => ({
           id: d.id,
-          documentId: d.document_id || d.kb_document_id || d.id,
+          documentId: d.document_id || d.kb_document_id || undefined,
           kbDocumentId: d.kb_document_id,
           name: d.name,
           type: d.name.split('.').pop()?.toLowerCase() || 'unknown',
@@ -116,7 +117,11 @@ export const KnowledgeBase: React.FC = () => {
   };
 
   const handleToggleDocumentSearch = async (doc: KBDocument) => {
-    if (!doc.documentId || togglingDocumentIdsRef.current.has(doc.documentId)) return;
+    if (!doc.documentId) {
+      setToast({ id: Date.now(), message: 'This file is not fully synced to AI search yet.', type: 'error' });
+      return;
+    }
+    if (togglingDocumentIdsRef.current.has(doc.documentId)) return;
 
     const nextSearchEnabled = !(doc.searchEnabled !== false);
     togglingDocumentIdsRef.current.add(doc.documentId);
@@ -135,6 +140,7 @@ export const KnowledgeBase: React.FC = () => {
         searchEnabled: nextSearchEnabled,
       } : item));
       setToast({
+        id: Date.now(),
         message: nextSearchEnabled ? 'AI search enabled for document.' : 'AI search disabled for document.',
         type: 'success',
       });
@@ -146,7 +152,7 @@ export const KnowledgeBase: React.FC = () => {
         searchEnabled: doc.searchEnabled,
       } : item));
       setError(err.response?.data?.error || 'Failed to update AI search state.');
-      setToast({ message: err.response?.data?.error || 'Failed to update AI search state.', type: 'error' });
+      setToast({ id: Date.now(), message: err.response?.data?.error || 'Failed to update AI search state.', type: 'error' });
     } finally {
       togglingDocumentIdsRef.current.delete(doc.documentId);
     }
@@ -228,18 +234,7 @@ export const KnowledgeBase: React.FC = () => {
 
   return (
     <div className="flex-1 bg-surface-bright dark:bg-slate-900 overflow-y-auto font-['Inter'] relative">
-      {toast && (
-        <div className={`fixed top-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl px-5 py-3 shadow-2xl ${
-          toast.type === 'success'
-            ? 'bg-emerald-500 text-white shadow-emerald-500/20'
-            : 'bg-red-500 text-white shadow-red-500/20'
-        }`}>
-          <span className="material-symbols-outlined text-xl">
-            {toast.type === 'success' ? 'check_circle' : 'error'}
-          </span>
-          <p className="text-sm font-semibold tracking-wide">{toast.message}</p>
-        </div>
-      )}
+      <NotificationToast key={toast?.id} notification={toast} />
       <div className="max-w-6xl mx-auto px-8 py-8 flex flex-col gap-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>

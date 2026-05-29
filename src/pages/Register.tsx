@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../services/api';
+import { NotificationToast, type NotificationToastData } from '../components/NotificationToast';
 
 export const Register: React.FC = () => {
   const [fullName, setFullName] = useState('');
@@ -9,7 +10,7 @@ export const Register: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [toast, setToast] = useState<NotificationToastData | null>(null);
 
   const [touchedEmail, setTouchedEmail] = useState(false);
   const [touchedPassword, setTouchedPassword] = useState(false);
@@ -32,7 +33,7 @@ export const Register: React.FC = () => {
   const isConfirmPasswordInvalid = touchedConfirm && confirmPassword.length > 0 && password !== confirmPassword;
 
   const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
+    setToast({ id: Date.now(), message, type });
     if (type === 'error') {
       setTimeout(() => setToast(null), 4000);
     }
@@ -103,19 +104,7 @@ export const Register: React.FC = () => {
 
   return (
     <>
-      {/* Nice Notification Popup (Toast) */}
-      {toast && (
-        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-4 fade-in duration-300 ${
-          toast.type === 'success' 
-            ? 'bg-emerald-500 text-white shadow-emerald-500/20' 
-            : 'bg-red-500 text-white shadow-red-500/20'
-        }`}>
-          <span className="material-symbols-outlined text-xl">
-            {toast.type === 'success' ? 'check_circle' : 'error'}
-          </span>
-          <p className="font-semibold text-sm tracking-wide">{toast.message}</p>
-        </div>
-      )}
+      <NotificationToast key={toast?.id} notification={toast} />
 
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
         <div className="text-center mb-8">

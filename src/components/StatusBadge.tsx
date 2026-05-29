@@ -14,6 +14,13 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, isFileManager 
           {isFileManager ? 'Uploaded' : 'Indexed'}
         </span>
       );
+    case 'uploaded':
+      return (
+        <span className="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium flex items-center gap-1">
+          <span className="material-symbols-outlined text-[14px]">cloud_done</span>
+          Uploaded
+        </span>
+      );
     case 'processing':
       return (
         <span className="px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-medium flex items-center gap-1">

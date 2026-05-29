@@ -19,6 +19,7 @@ export interface FileItem {
   document_id?: string | null;
   kb_document_id?: string | null;
   search_enabled?: boolean;
+  status?: 'indexed' | 'processing' | 'failed' | 'uploading' | 'uploaded';
   classification?: string | string[] | null;
   category?: string | null;
   document_type?: string | null;
@@ -32,7 +33,7 @@ export interface FileItem {
 
 export interface FileManagerDocument extends FileItem {
   type: string;
-  status: 'indexed' | 'processing' | 'failed' | 'uploading';
+  status: 'indexed' | 'processing' | 'failed' | 'uploading' | 'uploaded';
   progress?: number;
   isSyncing?: boolean;
   isTogglingSearch?: boolean;
