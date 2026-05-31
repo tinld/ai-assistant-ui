@@ -20,11 +20,11 @@ const uploadSlice = createSlice({
         task.progress = action.payload.progress;
       }
     },
-    updateUploadStatus: (state, action: PayloadAction<{ id: string; status: 'indexed' | 'failed' }>) => {
+    updateUploadStatus: (state, action: PayloadAction<{ id: string; status: 'processing' | 'uploaded' | 'indexed' | 'failed' }>) => {
       const task = state.tasks.find(t => t.id === action.payload.id);
       if (task) {
         task.status = action.payload.status;
-        if (action.payload.status === 'indexed') {
+        if (action.payload.status === 'processing' || action.payload.status === 'uploaded' || action.payload.status === 'indexed') {
           task.progress = 100;
         }
       }
@@ -33,7 +33,7 @@ const uploadSlice = createSlice({
       state.tasks = state.tasks.filter(t => t.id !== action.payload);
     },
     clearCompletedTasks: (state) => {
-      state.tasks = state.tasks.filter(t => t.status === 'uploading');
+      state.tasks = state.tasks.filter(t => t.status === 'uploading' || t.status === 'processing');
     }
   },
 });

@@ -6,21 +6,22 @@ import type { KBDocument, Fact } from '../types/knowledge-base.types';
 import { formatBytes } from '../utils/formatters';
 import { getFileIcon } from '../utils/file.utils';
 import { StatusBadge } from '../components/StatusBadge';
+import { NotificationToast, type NotificationToastData } from '../components/NotificationToast';
 import { Navigate } from 'react-router-dom';
 
 export const KnowledgeBase: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'documents' | 'facts'>('documents');
-  
-  // Documents state
+
   const [documents, setDocuments] = useState<KBDocument[]>([]);
   const [filter, setFilter] = useState<string>('All');
   const [search, setSearch] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<NotificationToastData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Facts state
+  const togglingDocumentIdsRef = useRef<Set<string>>(new Set());
+
   const [facts, setFacts] = useState<Fact[]>([]);
   const [loadingFacts, setLoadingFacts] = useState<boolean>(false);
   const [editingFact, setEditingFact] = useState<Fact | null>(null);
@@ -35,6 +36,12 @@ export const KnowledgeBase: React.FC = () => {
     }
   }, [token]);
 
+  useEffect(() => {
+    if (!toast) return;
+    const timeoutId = window.setTimeout(() => setToast(null), 2600);
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
+
   const loadDocuments = async (): Promise<KBDocument[]> => {
     try {
       setLoading(true);
@@ -42,12 +49,15 @@ export const KnowledgeBase: React.FC = () => {
       if (res && res.data && res.data.documents) {
         const loadedDocs: KBDocument[] = res.data.documents.map((d: any) => ({
           id: d.id,
+          documentId: d.document_id || d.kb_document_id || undefined,
+          kbDocumentId: d.kb_document_id,
           name: d.name,
           type: d.name.split('.').pop()?.toLowerCase() || 'unknown',
           size: formatBytes(d.size),
           uploadDate: new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
           status: d.status,
-          tags: d.domain ? [d.domain] : ['General']
+          tags: d.domain ? [d.domain] : ['General'],
+          searchEnabled: d.search_enabled !== false,
         }));
         setDocuments(prev => {
           const loadedNames = new Set(loadedDocs.map(doc => doc.name));
@@ -59,8 +69,8 @@ export const KnowledgeBase: React.FC = () => {
         return loadedDocs;
       }
     } catch (err) {
-      console.error("Failed to load knowledge base documents", err);
-      setError("Failed to load documents.");
+      console.error('Failed to load knowledge base documents', err);
+      setError('Failed to load documents.');
       return [];
     } finally {
       setLoading(false);
@@ -76,20 +86,20 @@ export const KnowledgeBase: React.FC = () => {
         setFacts(res.data.facts);
       }
     } catch (err) {
-      console.error("Failed to load facts", err);
+      console.error('Failed to load facts', err);
     } finally {
       setLoadingFacts(false);
     }
   };
 
   const handleDeleteFact = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this fact?")) return;
+    if (!window.confirm('Are you sure you want to delete this fact?')) return;
     try {
       await knowledgeBaseApi.deleteFact(id, token);
       setFacts(facts.filter(f => f.id !== id));
     } catch (err) {
-      console.error("Failed to delete fact", err);
-      alert("Failed to delete fact.");
+      console.error('Failed to delete fact', err);
+      alert('Failed to delete fact.');
     }
   };
 
@@ -101,8 +111,50 @@ export const KnowledgeBase: React.FC = () => {
       setFacts(facts.map(f => f.id === editingFact.id ? { ...f, text: editForm.text, domain: editForm.domain, timestamp: new Date().toISOString() } : f));
       setEditingFact(null);
     } catch (err) {
-      console.error("Failed to update fact", err);
-      alert("Failed to update fact.");
+      console.error('Failed to update fact', err);
+      alert('Failed to update fact.');
+    }
+  };
+
+  const handleToggleDocumentSearch = async (doc: KBDocument) => {
+    if (!doc.documentId) {
+      setToast({ id: Date.now(), message: 'This file is not fully synced to AI search yet.', type: 'error' });
+      return;
+    }
+    if (togglingDocumentIdsRef.current.has(doc.documentId)) return;
+
+    const nextSearchEnabled = !(doc.searchEnabled !== false);
+    togglingDocumentIdsRef.current.add(doc.documentId);
+    setDocuments(prev => prev.map(item => item.id === doc.id ? {
+      ...item,
+      isTogglingSearch: true,
+      searchEnabled: nextSearchEnabled,
+    } : item));
+    setError(null);
+
+    try {
+      await knowledgeBaseApi.setDocumentSearchEnabled(doc.documentId, nextSearchEnabled, token);
+      setDocuments(prev => prev.map(item => item.id === doc.id ? {
+        ...item,
+        isTogglingSearch: false,
+        searchEnabled: nextSearchEnabled,
+      } : item));
+      setToast({
+        id: Date.now(),
+        message: nextSearchEnabled ? 'AI search enabled for document.' : 'AI search disabled for document.',
+        type: 'success',
+      });
+    } catch (err: any) {
+      console.error('Failed to update AI search state', err);
+      setDocuments(prev => prev.map(item => item.id === doc.id ? {
+        ...item,
+        isTogglingSearch: false,
+        searchEnabled: doc.searchEnabled,
+      } : item));
+      setError(err.response?.data?.error || 'Failed to update AI search state.');
+      setToast({ id: Date.now(), message: err.response?.data?.error || 'Failed to update AI search state.', type: 'error' });
+    } finally {
+      togglingDocumentIdsRef.current.delete(doc.documentId);
     }
   };
 
@@ -113,9 +165,9 @@ export const KnowledgeBase: React.FC = () => {
   const processFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setError(null);
-    
+
     const file = files[0];
-    
+
     if (file.size > 50 * 1024 * 1024) {
       setError(`File "${file.name}" exceeds the 50MB limit.`);
       return;
@@ -169,8 +221,6 @@ export const KnowledgeBase: React.FC = () => {
     processFiles(e.dataTransfer.files);
   };
 
-
-
   const filteredDocs = documents.filter(doc => {
     if (filter !== 'All' && doc.type !== filter.toLowerCase()) return false;
     if (search && !doc.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -184,16 +234,15 @@ export const KnowledgeBase: React.FC = () => {
 
   return (
     <div className="flex-1 bg-surface-bright dark:bg-slate-900 overflow-y-auto font-['Inter'] relative">
+      <NotificationToast key={toast?.id} notification={toast} />
       <div className="max-w-6xl mx-auto px-8 py-8 flex flex-col gap-8">
-        
-        {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-on-surface dark:text-slate-200">Knowledge Base</h1>
             <p className="text-on-surface-variant dark:text-slate-400 mt-1">Manage documents, URLs, and data sources for your AI Assistant's context.</p>
           </div>
           {activeTab === 'documents' && (
-            <button 
+            <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 bg-primary dark:bg-violet-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-violet-700 active:scale-95 transition-all shadow-sm"
             >
@@ -201,16 +250,15 @@ export const KnowledgeBase: React.FC = () => {
               Upload Files
             </button>
           )}
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            hidden 
-            onChange={(e) => processFiles(e.target.files)} 
+          <input
+            type="file"
+            ref={fileInputRef}
+            hidden
+            onChange={(e) => processFiles(e.target.files)}
             accept=".pdf,.doc,.docx,.csv,.txt"
           />
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-outline-variant dark:border-slate-800">
           <button
             onClick={() => setActiveTab('documents')}
@@ -246,17 +294,16 @@ export const KnowledgeBase: React.FC = () => {
           </div>
         )}
 
-        {/* Search and Filters */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-2">
           {activeTab === 'documents' ? (
             <div className="flex flex-wrap gap-2">
               {['All', 'PDF', 'DOC', 'CSV', 'URL'].map(tab => (
-                <button 
+                <button
                   key={tab}
                   onClick={() => setFilter(tab)}
                   className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                    filter === tab 
-                      ? 'bg-violet-600 text-white' 
+                    filter === tab
+                      ? 'bg-violet-600 text-white'
                       : 'bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-800 text-on-surface-variant dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
@@ -270,11 +317,11 @@ export const KnowledgeBase: React.FC = () => {
               <span>{facts.length} facts indexed</span>
             </div>
           )}
-          
+
           <div className="relative w-full md:w-72">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder={`Search ${activeTab}...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -285,11 +332,10 @@ export const KnowledgeBase: React.FC = () => {
 
         {activeTab === 'documents' && (
           <>
-            {/* Drag & Drop Zone */}
-            <div 
+            <div
               className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-all duration-200 ${
-                isDragging 
-                  ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 scale-[1.02]' 
+                isDragging
+                  ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 scale-[1.02]'
                   : 'border-outline-variant dark:border-slate-700 hover:border-violet-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
               }`}
               onDragOver={handleDragOver}
@@ -306,7 +352,6 @@ export const KnowledgeBase: React.FC = () => {
               <button onClick={() => fileInputRef.current?.click()} className="text-violet-600 dark:text-violet-400 font-medium hover:underline cursor-pointer">Browse files from computer</button>
             </div>
 
-            {/* Document Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredDocs.map(doc => (
                 <div key={doc.id} className="bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-800 rounded-xl p-5 hover:shadow-md transition-shadow flex flex-col group">
@@ -323,9 +368,9 @@ export const KnowledgeBase: React.FC = () => {
                       <span className="material-symbols-outlined">more_vert</span>
                     </button>
                   </div>
-                  
+
                   <h4 className="font-semibold text-on-surface dark:text-slate-200 line-clamp-1 mb-1" title={doc.name}>{doc.name}</h4>
-                  
+
                   <div className="flex flex-wrap gap-1.5 mb-3 min-h-[20px]">
                     {doc.tags?.map((tag, i) => (
                       <span key={i} className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
@@ -339,7 +384,7 @@ export const KnowledgeBase: React.FC = () => {
                     <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700"></span>
                     <span>{doc.uploadDate}</span>
                   </div>
-                  
+
                   <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800/50 flex flex-col gap-3">
                     {doc.status === 'uploading' && doc.progress !== undefined ? (
                       <div className="w-full">
@@ -352,17 +397,35 @@ export const KnowledgeBase: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between">
-                        <StatusBadge status={doc.status} />
-                        {doc.status === 'failed' && (
-                          <button className="text-xs text-red-600 dark:text-red-400 hover:underline font-medium">Retry</button>
+                      <>
+                        <div className="flex items-center justify-between gap-3">
+                          <StatusBadge status={doc.status} />
+                          {doc.status === 'failed' ? (
+                            <button className="text-xs text-red-600 dark:text-red-400 hover:underline font-medium">Retry</button>
+                          ) : doc.documentId ? (
+                            <button
+                              onClick={() => handleToggleDocumentSearch(doc)}
+                              disabled={doc.isTogglingSearch}
+                              className={`flex items-center gap-1 text-xs font-semibold transition-colors disabled:opacity-50 ${doc.searchEnabled !== false ? 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                              title={doc.searchEnabled !== false ? 'Turn off AI search for this document' : 'Turn on AI search for this document'}
+                            >
+                              <span className={`material-symbols-outlined text-[14px] ${doc.isTogglingSearch ? 'animate-spin' : ''}`}>{doc.isTogglingSearch ? 'sync' : (doc.searchEnabled !== false ? 'toggle_on' : 'toggle_off')}</span>
+                              {doc.isTogglingSearch ? 'Saving...' : (doc.searchEnabled !== false ? 'AI Search On' : 'AI Search Off')}
+                            </button>
+                          ) : null}
+                        </div>
+                        {doc.documentId && (
+                          <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${doc.searchEnabled !== false ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                            <span className="material-symbols-outlined text-[14px]">psychology</span>
+                            {doc.searchEnabled !== false ? 'AI search on' : 'AI search off'}
+                          </span>
                         )}
-                      </div>
+                      </>
                     )}
                   </div>
                 </div>
               ))}
-              
+
               {filteredDocs.length === 0 && !loading && (
                 <div className="col-span-full py-12 flex flex-col items-center justify-center text-center">
                   <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 mb-4">
@@ -404,7 +467,7 @@ export const KnowledgeBase: React.FC = () => {
                         </span>
                       </div>
                       <div className="flex gap-2">
-                        <button 
+                        <button
                           onClick={() => {
                             setEditingFact(fact);
                             setEditForm({ text: fact.text, domain: fact.domain || '' });
@@ -414,7 +477,7 @@ export const KnowledgeBase: React.FC = () => {
                         >
                           <span className="material-symbols-outlined text-sm">edit</span>
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDeleteFact(fact.id)}
                           className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                           title="Delete Fact"
@@ -436,16 +499,14 @@ export const KnowledgeBase: React.FC = () => {
             )}
           </div>
         )}
-
       </div>
 
-      {/* Edit Fact Modal */}
       {editingFact && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
               <h3 className="font-bold text-lg text-slate-800 dark:text-slate-200">Edit Fact</h3>
-              <button 
+              <button
                 onClick={() => setEditingFact(null)}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               >
@@ -455,8 +516,8 @@ export const KnowledgeBase: React.FC = () => {
             <form onSubmit={handleEditFactSubmit} className="p-6 flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Domain</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={editForm.domain}
                   onChange={(e) => setEditForm({...editForm, domain: e.target.value})}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-violet-500"
@@ -465,7 +526,7 @@ export const KnowledgeBase: React.FC = () => {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Fact Content</label>
-                <textarea 
+                <textarea
                   value={editForm.text}
                   onChange={(e) => setEditForm({...editForm, text: e.target.value})}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-violet-500 min-h-[120px] resize-y"
@@ -474,14 +535,14 @@ export const KnowledgeBase: React.FC = () => {
                 />
               </div>
               <div className="flex justify-end gap-3 mt-2">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setEditingFact(null)}
                   className="px-4 py-2 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="px-4 py-2 rounded-lg font-medium bg-violet-600 text-white hover:bg-violet-700 transition-colors"
                 >
