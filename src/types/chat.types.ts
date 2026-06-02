@@ -8,6 +8,17 @@ export interface Message {
   type?: string;
 }
 
+export interface ChatConversation {
+  id: string;
+  backendConversationId?: string;
+  topic: string;
+  modelLabel: string;
+  agentId?: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: Message[];
+}
+
 export interface AttachedFile {
   name: string;
   size: string;
@@ -15,6 +26,8 @@ export interface AttachedFile {
 }
 
 export interface ChatState {
+  conversations: ChatConversation[];
+  activeConversationId: string | null;
   messages: Message[];
   isLoading: boolean;
   error: string | null;
@@ -22,5 +35,10 @@ export interface ChatState {
 
 export interface SendMessageInput {
   messageContent: string;
+  conversationId?: string;
+  clientConversationId?: string;
+  clientHistory?: Message[];
+  chatMode?: string;
   agentId?: string;
+  modelLabel?: string;
 }
