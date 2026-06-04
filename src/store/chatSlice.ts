@@ -1,25 +1,148 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { api, ApiError } from '../services/api';
 import type { RootState } from './index';
-import type { ChatState, Message, SendMessageInput } from '../types/chat.types';
+import type { ChatConversation, ChatState, Message, SendMessageInput } from '../types/chat.types';
+
+const CONVERSATIONS_STORAGE_KEY = 'ai-concierge-chat-conversations';
+const ACTIVE_CONVERSATION_STORAGE_KEY = 'ai-concierge-active-chat-id';
+
+const createId = (): string => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const nowIso = (): string => new Date().toISOString();
+
+const getConversationTopic = (messages: Message[], fallback = 'New chat'): string => {
+  const firstUserMessage = messages.find((message) => message.role === 'user')?.content.trim();
+  if (!firstUserMessage) return fallback;
+  return firstUserMessage.length > 48 ? `${firstUserMessage.slice(0, 48)}...` : firstUserMessage;
+};
+
+const createConversation = (values: Partial<ChatConversation> = {}): ChatConversation => {
+  const timestamp = nowIso();
+
+  return {
+    id: values.id ?? createId(),
+    backendConversationId: values.backendConversationId,
+    topic: values.topic ?? getConversationTopic(values.messages ?? []),
+    modelLabel: values.modelLabel ?? 'Default agent',
+    agentId: values.agentId,
+    createdAt: values.createdAt ?? timestamp,
+    updatedAt: values.updatedAt ?? timestamp,
+    messages: values.messages ?? [],
+  };
+};
+
+const readStoredConversations = (): { conversations: ChatConversation[]; activeConversationId: string | null } => {
+  if (typeof localStorage === 'undefined') {
+    return { conversations: [], activeConversationId: null };
+  }
+
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CONVERSATIONS_STORAGE_KEY) ?? '[]') as ChatConversation[];
+    const conversations = Array.isArray(parsed)
+      ? parsed
+          .filter((conversation) => conversation?.id && Array.isArray(conversation.messages))
+          .map((conversation) => ({
+            ...conversation,
+            backendConversationId: conversation.backendConversationId,
+            topic: conversation.topic || getConversationTopic(conversation.messages),
+            modelLabel: conversation.modelLabel || 'Default agent',
+            createdAt: conversation.createdAt || nowIso(),
+            updatedAt: conversation.updatedAt || conversation.createdAt || nowIso(),
+          }))
+      : [];
+    const storedActiveId = localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+    const activeConversationId = conversations.some((conversation) => conversation.id === storedActiveId)
+      ? storedActiveId
+      : conversations[0]?.id ?? null;
+
+    return { conversations, activeConversationId };
+  } catch {
+    return { conversations: [], activeConversationId: null };
+  }
+};
+
+const getActiveConversation = (state: ChatState): ChatConversation | undefined =>
+  state.conversations.find((conversation) => conversation.id === state.activeConversationId);
+
+const ensureActiveConversation = (state: ChatState): ChatConversation => {
+  const activeConversation = getActiveConversation(state);
+  if (activeConversation) return activeConversation;
+
+  const conversation = createConversation();
+  state.conversations.unshift(conversation);
+  state.activeConversationId = conversation.id;
+  state.messages = conversation.messages;
+  return conversation;
+};
+
+const syncActiveMessages = (state: ChatState): void => {
+  const activeConversation = getActiveConversation(state);
+  state.messages = activeConversation?.messages ?? [];
+};
+
+const appendMessageToActiveConversation = (state: ChatState, message: Message, modelLabel?: string, agentId?: string): void => {
+  const activeConversation = ensureActiveConversation(state);
+  const timestamp = nowIso();
+
+  activeConversation.messages.push({
+    ...message,
+    timestamp: message.timestamp ?? timestamp,
+  });
+  activeConversation.topic = getConversationTopic(activeConversation.messages, activeConversation.topic);
+  activeConversation.modelLabel = modelLabel ?? activeConversation.modelLabel;
+  activeConversation.agentId = agentId ?? activeConversation.agentId;
+  activeConversation.updatedAt = timestamp;
+  syncActiveMessages(state);
+};
+
+const storedState = readStoredConversations();
+const initialActiveConversation = storedState.conversations.find(
+  (conversation) => conversation.id === storedState.activeConversationId
+);
 
 const initialState: ChatState = {
-  messages: [],
+  conversations: storedState.conversations,
+  activeConversationId: storedState.activeConversationId,
+  messages: initialActiveConversation?.messages ?? [],
   isLoading: false,
   error: null,
 };
 
-// Thunks
 export const fetchHistory = createAsyncThunk(
   'chat/fetchHistory',
   async (_, { getState, rejectWithValue }) => {
     const state = getState() as RootState;
     const token = state.auth.token;
     if (!token) return rejectWithValue('No token');
-    
+    const activeConversation = getActiveConversation(state.chat);
+
     try {
-      const response = await api.get<{ success: boolean; history: Message[] }>('/api/chat/history', token);
-      return response.history;
+      if (activeConversation && !activeConversation.backendConversationId) {
+        return {
+          success: true,
+          conversation_id: undefined,
+          history: activeConversation.messages,
+          hasMore: false,
+          nextCursor: null,
+        };
+      }
+      const endpoint = activeConversation?.backendConversationId
+        ? `/api/chat/history?limit=30&conversation_id=${encodeURIComponent(activeConversation.backendConversationId)}`
+        : '/api/chat/history?limit=30';
+      const response = await api.get<{
+        success: boolean;
+        conversation_id?: string;
+        history: Message[];
+        hasMore?: boolean;
+        nextCursor?: { createdAt: string; _id: string } | null;
+      }>(endpoint, token);
+      return response;
     } catch (err: unknown) {
       if (err instanceof ApiError) return rejectWithValue(err.message);
       return rejectWithValue('Failed to fetch history');
@@ -35,11 +158,41 @@ export const sendMessage = createAsyncThunk(
     if (!token) return rejectWithValue('No token');
     const messageContent = typeof input === 'string' ? input : input.messageContent;
     const agentId = typeof input === 'string' ? undefined : input.agentId;
-    const requestBody = agentId ? { message: messageContent, agent_id: agentId } : { message: messageContent };
-    
+    const modelLabel = typeof input === 'string' ? undefined : input.modelLabel;
+    const chatMode = typeof input === 'string' ? undefined : input.chatMode;
+    const activeConversation = getActiveConversation(state.chat);
+    const conversationId = typeof input === 'string'
+      ? activeConversation?.backendConversationId
+      : input.conversationId ?? activeConversation?.backendConversationId;
+    const clientConversationId = typeof input === 'string'
+      ? activeConversation?.id
+      : input.clientConversationId ?? activeConversation?.id;
+    const localHistory = activeConversation?.backendConversationId
+      ? undefined
+      : activeConversation?.messages.slice(-21);
+    const lastLocalHistoryMessage = localHistory?.[localHistory.length - 1];
+    const clientHistory = localHistory && lastLocalHistoryMessage?.role === 'user' && lastLocalHistoryMessage.content === messageContent
+      ? localHistory.slice(0, -1)
+      : localHistory;
+    const requestBody = {
+      message: messageContent,
+      ...(agentId ? { agent_id: agentId } : {}),
+      ...(chatMode ? { chat_mode: chatMode } : {}),
+      ...(conversationId ? { conversation_id: conversationId } : {}),
+      ...(clientConversationId ? { client_conversation_id: clientConversationId } : {}),
+      ...(clientHistory?.length ? { client_history: clientHistory.slice(-20) } : {}),
+    };
+
     try {
-      const response = await api.post<{ success: boolean; response: string; user_message: string }>('/api/chat', requestBody, token);
-      return response;
+      const response = await api.post<{
+        success: boolean;
+        response: string;
+        conversation_id?: string;
+        user_message: string | Message;
+        assistant_message?: Message;
+        messages?: Message[];
+      }>('/api/chat', requestBody, token);
+      return { ...response, agentId, modelLabel };
     } catch (err: unknown) {
       if (err instanceof ApiError) return rejectWithValue(err.message);
       return rejectWithValue('Failed to send message');
@@ -53,9 +206,13 @@ export const clearChat = createAsyncThunk(
     const state = getState() as RootState;
     const token = state.auth.token;
     if (!token) return rejectWithValue('No token');
-    
+
     try {
-      await api.delete<{ success: boolean }>('/api/chat/history', token);
+      const activeConversation = getActiveConversation(state.chat);
+      const endpoint = activeConversation?.backendConversationId
+        ? `/api/chat/history?conversation_id=${encodeURIComponent(activeConversation.backendConversationId)}`
+        : '/api/chat/history';
+      await api.delete<{ success: boolean }>(endpoint, token);
       return true;
     } catch (err: unknown) {
       if (err instanceof ApiError) return rejectWithValue(err.message);
@@ -68,51 +225,151 @@ const chatSlice = createSlice({
   name: 'chat',
   initialState,
   reducers: {
-    // Optimistic update for UI
-    addLocalMessage: (state, action: PayloadAction<Message>) => {
-      state.messages.push(action.payload);
-    }
+    addLocalMessage: (state, action: PayloadAction<Message & { modelLabel?: string; agentId?: string }>) => {
+      appendMessageToActiveConversation(state, action.payload, action.payload.modelLabel, action.payload.agentId);
+    },
+    createChatConversation: (state, action: PayloadAction<{ modelLabel?: string; agentId?: string } | undefined>) => {
+      const existingEmptyConversation = state.conversations.find((conversation) => conversation.messages.length === 0);
+      if (existingEmptyConversation) {
+        existingEmptyConversation.modelLabel = action.payload?.modelLabel ?? existingEmptyConversation.modelLabel;
+        existingEmptyConversation.agentId = action.payload?.agentId ?? existingEmptyConversation.agentId;
+        existingEmptyConversation.updatedAt = nowIso();
+        state.activeConversationId = existingEmptyConversation.id;
+        state.messages = [];
+        state.error = null;
+        return;
+      }
+
+      const conversation = createConversation({
+        modelLabel: action.payload?.modelLabel,
+        agentId: action.payload?.agentId,
+      });
+      state.conversations.unshift(conversation);
+      state.activeConversationId = conversation.id;
+      state.messages = [];
+      state.error = null;
+    },
+    selectChatConversation: (state, action: PayloadAction<string>) => {
+      if (!state.conversations.some((conversation) => conversation.id === action.payload)) return;
+
+      state.activeConversationId = action.payload;
+      state.error = null;
+      syncActiveMessages(state);
+    },
+    renameChatConversation: (state, action: PayloadAction<{ id: string; topic: string }>) => {
+      const topic = action.payload.topic.trim();
+      if (!topic) return;
+
+      const conversation = state.conversations.find((item) => item.id === action.payload.id);
+      if (!conversation) return;
+
+      conversation.topic = topic;
+      conversation.updatedAt = nowIso();
+    },
+    deleteChatConversation: (state, action: PayloadAction<string>) => {
+      state.conversations = state.conversations.filter((conversation) => conversation.id !== action.payload);
+
+      if (state.activeConversationId === action.payload) {
+        const nextConversation = state.conversations[0] ?? createConversation();
+        if (state.conversations.length === 0) {
+          state.conversations.push(nextConversation);
+        }
+        state.activeConversationId = nextConversation.id;
+      }
+
+      state.error = null;
+      syncActiveMessages(state);
+    },
+    clearActiveConversation: (state) => {
+      const activeConversation = ensureActiveConversation(state);
+      activeConversation.messages = [];
+      activeConversation.topic = 'New chat';
+      activeConversation.updatedAt = nowIso();
+      state.messages = [];
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch History
       .addCase(fetchHistory.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
       .addCase(fetchHistory.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.messages = action.payload || [];
+
+        if (state.conversations.length === 0 && action.payload?.history?.length) {
+          const conversation = createConversation({
+            backendConversationId: action.payload.conversation_id,
+            topic: getConversationTopic(action.payload.history),
+            messages: action.payload.history,
+          });
+          state.conversations.push(conversation);
+          state.activeConversationId = conversation.id;
+        } else if (action.payload?.conversation_id) {
+          const activeConversation = ensureActiveConversation(state);
+          if (!activeConversation.backendConversationId) {
+            activeConversation.backendConversationId = action.payload.conversation_id;
+          }
+          if (activeConversation.messages.length === 0) {
+            activeConversation.messages = action.payload.history ?? [];
+            activeConversation.topic = getConversationTopic(activeConversation.messages, activeConversation.topic);
+          }
+        }
+
+        if (state.conversations.length === 0) {
+          const conversation = createConversation();
+          state.conversations.push(conversation);
+          state.activeConversationId = conversation.id;
+        }
+
+        syncActiveMessages(state);
       })
       .addCase(fetchHistory.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      
-      // Send Message
       .addCase(sendMessage.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
       .addCase(sendMessage.fulfilled, (state, action) => {
         state.isLoading = false;
-        // Append the AI's response
-        state.messages.push({
-          role: 'assistant',
-          content: action.payload.response,
-        });
+        const activeConversation = ensureActiveConversation(state);
+        if (action.payload.conversation_id) {
+          activeConversation.backendConversationId = action.payload.conversation_id;
+        }
+        appendMessageToActiveConversation(
+          state,
+          action.payload.assistant_message ?? {
+            role: 'assistant',
+            content: action.payload.response,
+          },
+          action.payload.modelLabel,
+          action.payload.agentId
+        );
       })
       .addCase(sendMessage.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      
-      // Clear Chat
       .addCase(clearChat.fulfilled, (state) => {
+        const activeConversation = ensureActiveConversation(state);
+        activeConversation.messages = [];
+        activeConversation.topic = 'New chat';
+        activeConversation.updatedAt = nowIso();
         state.messages = [];
       });
   },
 });
 
-export const { addLocalMessage } = chatSlice.actions;
+export const {
+  addLocalMessage,
+  createChatConversation,
+  selectChatConversation,
+  renameChatConversation,
+  deleteChatConversation,
+  clearActiveConversation,
+} = chatSlice.actions;
+export { CONVERSATIONS_STORAGE_KEY, ACTIVE_CONVERSATION_STORAGE_KEY };
 export default chatSlice.reducer;

@@ -9,15 +9,15 @@ export const MainLayout: React.FC = () => {
   const isSidebarOpen = useSelector((state: RootState) => state.app.isSidebarOpen);
 
   return (
-    <div className="min-h-screen bg-background flex transition-all duration-300">
+    <div className="min-h-screen bg-background flex overflow-hidden transition-all duration-300">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
+      <div
+        className={`flex min-h-screen min-w-0 flex-1 flex-col transition-all duration-300 ${
+          isSidebarOpen ? 'ml-64 w-[calc(100%-16rem)]' : 'ml-20 w-[calc(100%-5rem)]'
+        }`}
+      >
         <Header />
-        <main 
-          className={`h-[calc(100vh-64px)] flex bg-background transition-all duration-300 ${
-            isSidebarOpen ? 'ml-64 w-[calc(100%-16rem)]' : 'ml-20 w-[calc(100%-5rem)]'
-          }`}
-        >
+        <main className="flex h-[calc(100vh-64px)] min-h-0 bg-background transition-all duration-300">
           <Outlet />
         </main>
       </div>
