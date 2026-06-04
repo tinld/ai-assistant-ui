@@ -11,6 +11,7 @@ import {
   Database,
   FileText,
   Check,
+  ChevronDown,
   Layers3,
   Lightbulb,
   MessageSquarePlus,
@@ -123,33 +124,34 @@ const formatConversationTime = (timestamp: string): string => {
 interface AssistantResponseProps {
   message: Message;
   onUsePrompt: (prompt: string) => void;
+  assistantLabel: string;
 }
 
-const AssistantResponse: React.FC<AssistantResponseProps> = ({ message, onUsePrompt }) => {
+const AssistantResponse: React.FC<AssistantResponseProps> = ({ message, onUsePrompt, assistantLabel }) => {
   const hasHtml = message.content.includes('<div');
 
   return (
-    <article className="group flex w-full max-w-3xl items-start gap-3">
-      <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 via-indigo-600 to-teal-600 text-white shadow-lg shadow-violet-500/20">
-        <Bot className="h-5 w-5" aria-hidden="true" />
+    <article className="group flex w-full max-w-[44rem] items-start gap-2.5">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 via-indigo-600 to-teal-600 text-white shadow-lg shadow-violet-500/20">
+        <Bot className="h-4 w-4" aria-hidden="true" />
       </div>
 
-      <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-white/70 bg-white/90 px-4 py-3 shadow-[0_16px_42px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/90 dark:shadow-black/30">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <span className="text-xs font-bold text-violet-700 dark:text-violet-300">Assistant</span>
+      <div className="min-w-0 flex-1 rounded-xl rounded-tl-md border border-white/70 bg-white/90 px-3.5 py-2.5 shadow-[0_12px_34px_rgba(15,23,42,0.07)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/90 dark:shadow-black/30">
+        <div className="mb-1.5 flex items-center justify-between gap-3">
+          <span className="text-xs font-bold text-violet-700 dark:text-violet-300">{assistantLabel}</span>
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
-            <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+            <Clock3 className="h-3 w-3" aria-hidden="true" />
             {formatMessageTime(message.timestamp)}
           </span>
         </div>
-        <div className="prose prose-sm max-w-none text-slate-700 dark:prose-invert dark:text-slate-200">
+        <div className="prose prose-sm max-w-none text-[13px] text-slate-700 dark:prose-invert dark:text-slate-200">
           {hasHtml ? (
             <div className="ai-response-content" dangerouslySetInnerHTML={{ __html: message.content }} />
           ) : (
-            <p className="whitespace-pre-wrap leading-7">{message.content}</p>
+            <p className="whitespace-pre-wrap leading-6">{message.content}</p>
           )}
         </div>
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200/70 pt-3 dark:border-slate-800">
+        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-200/70 pt-2.5 dark:border-slate-800">
             {[
               { label: 'Summarize', icon: Sparkles, prompt: 'Summarize the previous answer.' },
               { label: 'Explain', icon: Lightbulb, prompt: 'Explain the previous answer more simply.' },
@@ -161,9 +163,9 @@ const AssistantResponse: React.FC<AssistantResponseProps> = ({ message, onUsePro
                   key={action.label}
                   type="button"
                   onClick={() => onUsePrompt(action.prompt)}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 transition-all hover:border-violet-300 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-700 dark:hover:text-violet-300"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition-all hover:border-violet-300 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-700 dark:hover:text-violet-300"
                 >
-                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                   {action.label}
                 </button>
               );
@@ -181,11 +183,11 @@ interface UserMessageProps {
 
 const UserMessage: React.FC<UserMessageProps> = ({ message, fallbackInitial }) => (
   <article className="flex w-full justify-end">
-    <div className="flex max-w-3xl flex-row-reverse items-start gap-3">
-      <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold uppercase text-white shadow-lg shadow-slate-900/15 dark:bg-slate-100 dark:text-slate-900">
+    <div className="flex max-w-[44rem] flex-row-reverse items-start gap-2.5">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold uppercase text-white shadow-lg shadow-slate-900/15 dark:bg-slate-100 dark:text-slate-900">
         {fallbackInitial}
       </div>
-      <div className="rounded-2xl rounded-tr-md bg-slate-900 px-4 py-3 text-sm leading-6 text-white shadow-[0_14px_35px_rgba(15,23,42,0.16)] dark:bg-slate-100 dark:text-slate-950">
+      <div className="rounded-xl rounded-tr-md bg-slate-900 px-3.5 py-2.5 text-[13px] leading-6 text-white shadow-[0_12px_32px_rgba(15,23,42,0.14)] dark:bg-slate-100 dark:text-slate-950">
         <p className="whitespace-pre-wrap">{message.content}</p>
       </div>
     </div>
@@ -207,8 +209,10 @@ export const Chat: React.FC = () => {
   const [openConversationMenuId, setOpenConversationMenuId] = useState<string | null>(null);
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
   const [editingTopic, setEditingTopic] = useState('');
+  const [isAgentPickerOpen, setIsAgentPickerOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const agentPickerRef = useRef<HTMLDivElement>(null);
   const selectedAgent = useMemo(
     () => agents.find((agent) => agent.agent_id === selectedAgentId) ?? null,
     [agents, selectedAgentId]
@@ -275,6 +279,30 @@ export const Chat: React.FC = () => {
       inputRef.current.focus();
     }
   }, [isLoading]);
+
+  useEffect(() => {
+    if (!isAgentPickerOpen) return;
+
+    const handlePointerDown = (event: MouseEvent): void => {
+      if (!agentPickerRef.current?.contains(event.target as Node)) {
+        setIsAgentPickerOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setIsAgentPickerOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isAgentPickerOpen]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -379,34 +407,34 @@ export const Chat: React.FC = () => {
     command.cmd.startsWith(inputValue.split(' ')[0])
   );
   const userInitial = user?.full_name?.[0] || user?.email?.[0] || 'U';
-
+  const assistantLabel = activeConversation?.modelLabel ?? selectedAgent?.name ?? 'Default agent';
   return (
     <div className="flex h-full min-h-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.10),transparent_28%),linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.16),transparent_30%),linear-gradient(180deg,#020617_0%,#0f172a_100%)]">
-      <aside className={`hidden min-h-0 shrink-0 flex-col border-r border-white/70 bg-white/72 backdrop-blur-xl transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-950/72 lg:flex ${isRecentConversationsOpen ? 'w-72' : 'w-16'}`}>
-        <div className={`flex h-16 shrink-0 items-center border-b border-slate-200/70 px-3 dark:border-slate-800 ${isRecentConversationsOpen ? 'justify-between' : 'justify-center'}`}>
+      <aside className={`hidden min-h-0 shrink-0 flex-col border-r border-white/70 bg-white/72 backdrop-blur-xl transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-950/72 lg:flex ${isRecentConversationsOpen ? 'w-64' : 'w-14'}`}>
+        <div className={`flex h-14 shrink-0 items-center border-b border-slate-200/70 px-3 dark:border-slate-800 ${isRecentConversationsOpen ? 'justify-between' : 'justify-center'}`}>
           {isRecentConversationsOpen && (
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.1em] text-violet-600 dark:text-violet-300">Chats</p>
-              <h2 className="truncate text-base font-bold text-slate-950 dark:text-white">Manage Chat</h2>
+              <h2 className="truncate text-sm font-bold text-slate-950 dark:text-white">Manage Chat</h2>
             </div>
           )}
           <button
             type="button"
             onClick={() => dispatch(toggleRecentConversations())}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300"
             title={isRecentConversationsOpen ? 'Collapse chat manager' : 'Expand chat manager'}
           >
             {isRecentConversationsOpen ? <PanelLeftClose className="h-4 w-4" aria-hidden="true" /> : <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />}
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
           {isRecentConversationsOpen ? (
             <>
               <button
                 type="button"
                 onClick={handleNewChat}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-600/20 transition-all hover:-translate-y-0.5 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-600/20 transition-all hover:-translate-y-0.5 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500"
               >
                 <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
                 New Chat
@@ -420,7 +448,7 @@ export const Chat: React.FC = () => {
                   return (
                     <div
                       key={conversation.id}
-                      className={`group relative rounded-xl border p-3 transition-colors ${
+                      className={`group relative rounded-xl border p-2.5 transition-colors ${
                         isActive
                           ? 'border-violet-200 bg-violet-50/90 dark:border-violet-900/50 dark:bg-violet-950/25'
                           : 'border-slate-200 bg-white/70 hover:border-violet-200 hover:bg-white dark:border-slate-800 dark:bg-slate-950/70 dark:hover:border-violet-900'
@@ -435,7 +463,7 @@ export const Chat: React.FC = () => {
                               if (event.key === 'Enter') handleSaveRename();
                               if (event.key === 'Escape') setEditingConversationId(null);
                             }}
-                            className="w-full rounded-lg border border-violet-200 bg-white px-2.5 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 dark:border-violet-900 dark:bg-slate-900 dark:text-slate-100"
+                            className="w-full rounded-lg border border-violet-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 dark:border-violet-900 dark:bg-slate-900 dark:text-slate-100"
                             autoFocus
                           />
                           <div className="flex gap-2">
@@ -464,13 +492,13 @@ export const Chat: React.FC = () => {
                             onClick={() => handleSelectConversation(conversation.id)}
                             className="block w-full pr-8 text-left focus:outline-none"
                           >
-                            <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{conversation.topic}</p>
+                            <p className="truncate text-[13px] font-bold text-slate-900 dark:text-slate-100">{conversation.topic}</p>
                             <div className="mt-1 flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                               <span className="truncate">{conversation.modelLabel}</span>
                               <span aria-hidden="true">•</span>
                               <span>{conversation.messages.length} msg</span>
                             </div>
-                            <p className="mt-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                            <p className="mt-1.5 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
                               {formatConversationTime(conversation.updatedAt)}
                             </p>
                           </button>
@@ -478,7 +506,7 @@ export const Chat: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setOpenConversationMenuId(openConversationMenuId === conversation.id ? null : conversation.id)}
-                            className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 opacity-100 transition-colors hover:bg-white hover:text-slate-700 dark:hover:bg-slate-900 dark:hover:text-slate-200"
+                            className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 opacity-100 transition-colors hover:bg-white hover:text-slate-700 dark:hover:bg-slate-900 dark:hover:text-slate-200"
                             title="Conversation actions"
                           >
                             <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
@@ -514,7 +542,7 @@ export const Chat: React.FC = () => {
               <button
                 type="button"
                 onClick={handleClearChat}
-                className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-900/40"
+                className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-900/40"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
                 Clear History
@@ -525,7 +553,7 @@ export const Chat: React.FC = () => {
               <button
                 type="button"
                 onClick={handleNewChat}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 text-white shadow-lg shadow-violet-600/20 transition-colors hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 text-white shadow-lg shadow-violet-600/20 transition-colors hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500"
                 title="New chat"
               >
                 <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
@@ -533,7 +561,7 @@ export const Chat: React.FC = () => {
               <button
                 type="button"
                 onClick={handleClearChat}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
                 title="Clear history"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -543,27 +571,27 @@ export const Chat: React.FC = () => {
         </div>
       </aside>
 
-      <section className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col">
+      <section className="mx-auto flex min-h-0 w-full max-w-[88rem] flex-1 flex-col">
         {error && (
-          <div className="shrink-0 px-4 pt-4 sm:px-6 lg:px-8">
+          <div className="shrink-0 px-4 pt-3 sm:px-5 lg:px-6">
             <div
               role="alert"
-              className="mx-auto flex max-w-5xl flex-col gap-3 rounded-xl border border-red-200 bg-red-50/95 p-4 text-red-800 shadow-[0_16px_45px_rgba(127,29,29,0.12)] backdrop-blur dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200 sm:flex-row sm:items-center sm:justify-between"
+               className="mx-auto flex max-w-6xl flex-col gap-3 rounded-xl border border-red-200 bg-red-50/95 p-3 text-red-800 shadow-[0_16px_45px_rgba(127,29,29,0.12)] backdrop-blur dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex min-w-0 items-start gap-3">
-                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200">
-                  <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200">
+                    <AlertTriangle className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm font-bold">Something went wrong</p>
-                  <p className="mt-1 break-words text-sm leading-6 text-red-700/85 dark:text-red-200/85">{error}</p>
+                  <p className="mt-1 break-words text-[13px] leading-5 text-red-700/85 dark:text-red-200/85">{error}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={handleRetryLastMessage}
                 disabled={!lastUserMessage || isLoading}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-800 dark:bg-red-950/70 dark:text-red-200 dark:hover:bg-red-900/40"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-800 dark:bg-red-950/70 dark:text-red-200 dark:hover:bg-red-900/40"
               >
                 <RotateCcw className="h-4 w-4" aria-hidden="true" />
                 Retry
@@ -572,30 +600,30 @@ export const Chat: React.FC = () => {
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-6 scroll-smooth sm:px-6 lg:px-8">
-          <div className="mx-auto flex max-w-5xl flex-col gap-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4 scroll-smooth sm:px-5 lg:px-6">
+          <div className="mx-auto flex max-w-6xl flex-col gap-4">
             {messages.length === 0 && !isLoading ? (
-              <div className="grid min-h-full content-center gap-8 py-8">
+              <div className="grid min-h-full content-center gap-6 py-6">
                 <div className="max-w-3xl">
-                  <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white/78 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-violet-700 shadow-sm backdrop-blur dark:border-violet-900/60 dark:bg-slate-950/78 dark:text-violet-300">
-                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white/78 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-violet-700 shadow-sm backdrop-blur dark:border-violet-900/60 dark:bg-slate-950/78 dark:text-violet-300">
+                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                     Ready
                   </div>
-                  <h1 className="text-3xl font-bold leading-tight text-slate-950 dark:text-white sm:text-4xl">
+                  <h1 className="text-2xl font-bold leading-tight text-slate-950 dark:text-white sm:text-3xl">
                     Good to see you, {user?.full_name || 'there'}.
                   </h1>
-                  <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
+                  <p className="mt-2.5 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                     Ask anything. I will keep the answer clear and useful.
                   </p>
                   {selectedAgent && (
-                    <div className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white/82 px-3 py-2 text-sm font-bold text-slate-700 dark:border-slate-800 dark:bg-slate-950/82 dark:text-slate-200">
-                      <Bot className="h-4 w-4 text-violet-600 dark:text-violet-300" aria-hidden="true" />
+                    <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white/82 px-3 py-1.5 text-sm font-bold text-slate-700 dark:border-slate-800 dark:bg-slate-950/82 dark:text-slate-200">
+                      <Bot className="h-3.5 w-3.5 text-violet-600 dark:text-violet-300" aria-hidden="true" />
                       Working with {selectedAgent.name}
                     </div>
                   )}
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-2.5 sm:grid-cols-2">
                   {starterPrompts.map((item) => {
                     const Icon = item.icon;
                     return (
@@ -603,16 +631,16 @@ export const Chat: React.FC = () => {
                         key={item.title}
                         type="button"
                         onClick={() => handleUsePrompt(item.prompt)}
-                        className="group rounded-xl border border-white/80 bg-white/82 p-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.07)] backdrop-blur transition-all hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_24px_60px_rgba(88,28,135,0.14)] focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-slate-800 dark:bg-slate-950/82 dark:hover:border-violet-700"
+                        className="group rounded-xl border border-white/80 bg-white/82 p-3.5 text-left shadow-[0_18px_45px_rgba(15,23,42,0.07)] backdrop-blur transition-all hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_24px_60px_rgba(88,28,135,0.14)] focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-slate-800 dark:bg-slate-950/82 dark:hover:border-violet-700"
                       >
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition-colors group-hover:bg-violet-100 group-hover:text-violet-700 dark:bg-slate-900 dark:text-slate-300 dark:group-hover:bg-violet-900/30 dark:group-hover:text-violet-300">
-                            <Icon className="h-5 w-5" aria-hidden="true" />
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition-colors group-hover:bg-violet-100 group-hover:text-violet-700 dark:bg-slate-900 dark:text-slate-300 dark:group-hover:bg-violet-900/30 dark:group-hover:text-violet-300">
+                            <Icon className="h-4 w-4" aria-hidden="true" />
                           </span>
-                          <ArrowRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-violet-600 dark:group-hover:text-violet-300" aria-hidden="true" />
+                          <ArrowRight className="h-3.5 w-3.5 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-violet-600 dark:group-hover:text-violet-300" aria-hidden="true" />
                         </div>
-                        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">{item.title}</h2>
-                        <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{item.prompt}</p>
+                        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">{item.title}</h2>
+                        <p className="mt-1 text-[13px] leading-5 text-slate-500 dark:text-slate-400">{item.prompt}</p>
                       </button>
                     );
                   })}
@@ -622,18 +650,18 @@ export const Chat: React.FC = () => {
               <>
                 {messages.map((msg, index) => (
                   msg.role === 'assistant' ? (
-                    <AssistantResponse key={msg.id ?? index} message={msg} onUsePrompt={handleUsePrompt} />
+                    <AssistantResponse key={msg.id ?? index} message={msg} onUsePrompt={handleUsePrompt} assistantLabel={assistantLabel} />
                   ) : (
                     <UserMessage key={msg.id ?? index} message={msg} fallbackInitial={userInitial} />
                   )
                 ))}
 
                 {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                  <div className="flex w-full max-w-3xl items-start gap-3">
-                    <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-teal-600 text-white shadow-lg shadow-violet-500/20">
-                      <Bot className="h-5 w-5" aria-hidden="true" />
+                  <div className="flex w-full max-w-[44rem] items-start gap-2.5">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-teal-600 text-white shadow-lg shadow-violet-500/20">
+                      <Bot className="h-4 w-4" aria-hidden="true" />
                     </div>
-                    <div className="rounded-2xl rounded-tl-md border border-white/70 bg-white/90 px-4 py-3 shadow-[0_16px_42px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/90">
+                    <div className="rounded-xl rounded-tl-md border border-white/70 bg-white/90 px-3.5 py-2.5 shadow-[0_12px_34px_rgba(15,23,42,0.07)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/90">
                       <div className="flex items-center gap-2">
                         <span className="h-2 w-2 animate-bounce rounded-full bg-violet-500"></span>
                         <span className="h-2 w-2 animate-bounce rounded-full bg-violet-500 [animation-delay:120ms]"></span>
@@ -648,11 +676,11 @@ export const Chat: React.FC = () => {
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-white/70 bg-[#eef4ff]/92 px-4 py-4 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-900/92 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-5xl">
+        <div className="shrink-0 border-t border-white/70 bg-[#eef4ff]/92 px-4 py-3 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-900/92 sm:px-5 lg:px-6">
+          <div className="mx-auto max-w-6xl">
             {inputValue.startsWith('/') && visibleCommands.length > 0 && (
               <div className="mb-2 overflow-hidden rounded-xl border border-slate-200 bg-white/95 shadow-xl backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
-                <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.08em] text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
                   <Command className="h-4 w-4" aria-hidden="true" />
                   Command suggestions
                 </div>
@@ -666,15 +694,15 @@ export const Chat: React.FC = () => {
                           setInputValue(command.cmd === '/rules' || command.cmd === '/clear' ? command.cmd : `${command.cmd} `);
                           inputRef.current?.focus();
                         }}
-                        className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-0 hover:bg-violet-50 dark:border-slate-800/70 dark:hover:bg-slate-900"
+                        className="flex w-full items-center gap-3 border-b border-slate-100 px-3 py-2.5 text-left transition-colors last:border-0 hover:bg-violet-50 dark:border-slate-800/70 dark:hover:bg-slate-900"
                         type="button"
                       >
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                          <Icon className="h-4 w-4" aria-hidden="true" />
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                         </span>
                         <span className="min-w-0">
-                          <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">{command.cmd}</span>
-                          <span className="block text-xs text-slate-500 dark:text-slate-400">{command.desc}</span>
+                          <span className="block text-[13px] font-bold text-slate-900 dark:text-slate-100">{command.cmd}</span>
+                          <span className="block text-[11px] text-slate-500 dark:text-slate-400">{command.desc}</span>
                         </span>
                       </button>
                     );
@@ -683,37 +711,98 @@ export const Chat: React.FC = () => {
               </div>
             )}
 
-            <div className={`rounded-2xl border border-white/80 bg-white/90 p-2 shadow-[0_22px_70px_rgba(88,28,135,0.18)] backdrop-blur-xl transition-all duration-300 focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-500/40 dark:border-slate-800 dark:bg-slate-950/90 ${isLoading ? 'pointer-events-none opacity-75' : ''}`}>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 px-2 pb-2 dark:border-slate-800">
+            <div className={`rounded-xl border border-white/80 bg-white/90 p-2 shadow-[0_18px_54px_rgba(88,28,135,0.16)] backdrop-blur-xl transition-all duration-300 focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-500/40 dark:border-slate-800 dark:bg-slate-950/90 ${isLoading ? 'pointer-events-none opacity-75' : ''}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-200/80 px-1.5 pb-2 dark:border-slate-800">
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                  <div className="flex h-12 min-w-[220px] max-w-full flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 dark:border-slate-800 dark:bg-slate-900/70 sm:max-w-xs">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-violet-700 shadow-sm dark:bg-slate-950 dark:text-violet-300">
-                      <Bot className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-[10px] font-bold uppercase leading-3 tracking-[0.08em] text-slate-400 dark:text-slate-500">
-                        Model
+                  <div ref={agentPickerRef} className="relative min-w-[130px]">
+                    <button
+                      type="button"
+                      onClick={() => setIsAgentPickerOpen((current) => !current)}
+                      className={`flex h-9 items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition-all focus:outline-none focus:ring-2 focus:ring-violet-500/40 ${
+                        isAgentPickerOpen
+                          ? 'border-violet-300 bg-white shadow-[0_14px_30px_rgba(109,40,217,0.14)] dark:border-violet-500/60 dark:bg-slate-950'
+                          : 'border-slate-200 bg-slate-50 hover:border-violet-200 hover:bg-white dark:border-slate-800 dark:bg-slate-900/70 dark:hover:border-slate-700 dark:hover:bg-slate-900'
+                      }`}
+                      aria-haspopup="listbox"
+                      aria-expanded={isAgentPickerOpen}
+                      aria-label="Select AI agent"
+                      disabled={agents.length === 0}
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-violet-700 shadow-sm dark:bg-slate-950 dark:text-violet-300">
+                        <Bot className="h-3.5 w-3.5" aria-hidden="true" />
                       </span>
-                      <select
-                        value={selectedAgentId}
-                        onChange={(e) => setSelectedAgentId(e.target.value)}
-                        className="h-5 w-full truncate border-none bg-transparent p-0 text-sm font-bold leading-5 text-slate-800 focus:ring-0 dark:text-slate-100"
-                        title="AI Agent"
-                      >
-                        {agents.length === 0 ? (
-                          <option value="">Default agent</option>
-                        ) : (
-                          agents.map((agent) => (
-                            <option key={agent.agent_id} value={agent.agent_id}>
-                              {agent.name}{agent.is_active ? ' (active)' : ''}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="mt-0.5 block truncate text-[13px] font-bold leading-4 text-slate-800 dark:text-slate-100">
+                          {selectedAgent?.name ?? 'Default agent'}
+                        </span>
+                      </div>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform dark:text-slate-500 ${isAgentPickerOpen ? 'rotate-180 text-violet-600 dark:text-violet-300' : ''}`}
+                        aria-hidden="true"
+                      />
+                    </button>
+
+                    {isAgentPickerOpen && agents.length > 0 && (
+                      <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-30 w-[18rem] max-w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-[0_24px_70px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95">
+                        <div className="border-b border-slate-200/80 px-3 py-2.5 dark:border-slate-800">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-violet-600 dark:text-violet-300">
+                            Assistant models
+                          </p>
+                          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            Pick the profile for this chat.
+                          </p>
+                        </div>
+                        <div className="max-h-72 overflow-y-auto p-1.5" role="listbox" aria-label="AI agent options">
+                          {agents.map((agent) => {
+                            const isSelected = agent.agent_id === selectedAgentId;
+
+                            return (
+                              <button
+                                key={agent.agent_id}
+                                type="button"
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => {
+                                  setSelectedAgentId(agent.agent_id);
+                                  setIsAgentPickerOpen(false);
+                                }}
+                                className={`mb-1 flex w-full items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition-all last:mb-0 ${
+                                  isSelected
+                                    ? 'border-violet-200 bg-violet-50 shadow-sm dark:border-violet-500/40 dark:bg-violet-950/20'
+                                    : 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-slate-900/80'
+                                }`}
+                              >
+                                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                                  isSelected
+                                    ? 'bg-violet-600 text-white dark:bg-violet-500'
+                                    : 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400'
+                                }`}>
+                                  {isSelected ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Bot className="h-3.5 w-3.5" aria-hidden="true" />}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="flex items-center justify-between gap-2">
+                                    <span className="truncate text-[13px] font-bold text-slate-900 dark:text-slate-100">
+                                      {agent.name}
+                                    </span>
+                                    {agent.is_active && (
+                                      <span className="inline-flex shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                                        Active
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="mt-0.5 block truncate text-[10px] font-semibold uppercase tracking-[0.04em] text-slate-500 dark:text-slate-400">
+                                    {agent.model_profile.provider} / {agent.model_profile.model_name}
+                                  </span>
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="inline-flex h-12 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/70" role="group" aria-label="Chat classification mode">
+                  <div className=" h-9 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/70" role="group" aria-label="Chat classification mode">
                     {chatModeOptions.map((mode) => {
                       const Icon = mode.icon;
                       const isActive = chatMode === mode.value;
@@ -723,21 +812,21 @@ export const Chat: React.FC = () => {
                           key={mode.value}
                           type="button"
                           onClick={() => setChatMode(mode.value)}
-                          className={`inline-flex h-10 min-w-[4.75rem] items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                          className={`inline-flex h-7 min-w-[4.5rem] items-center justify-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold transition-all focus:outline-none focus:ring-2 focus:ring-violet-500 ${
                             isActive
                               ? 'bg-violet-600 text-white shadow-sm shadow-violet-600/20 dark:bg-violet-500 dark:text-white dark:shadow-violet-950/30'
                               : 'text-slate-500 hover:bg-white/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-950/70 dark:hover:text-slate-100'
                           }`}
                           title={`${mode.label} ${mode.description}`}
                         >
-                          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                           <span>{mode.label}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                   {isLoggingEnabled && (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500"></span>
@@ -745,43 +834,43 @@ export const Chat: React.FC = () => {
                     </span>
                   )}
                   <span className="hidden items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 sm:inline-flex">
-                    <SelectedChatModeIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                    <SelectedChatModeIcon className="h-3 w-3" aria-hidden="true" />
                     {selectedChatMode.description}
                   </span>
                 </div>
                 <button
                   onClick={handleClearChat}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 dark:text-slate-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 dark:text-slate-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
                   type="button"
                 >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  <Trash2 className="h-3 w-3" aria-hidden="true" />
                   Clear
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <button className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300" title="Attach file" type="button">
-                  <Paperclip className="h-5 w-5" aria-hidden="true" />
+              <div className="flex items-center gap-1 pt-1">
+                <button className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300" title="Attach file" type="button">
+                  <Paperclip className="h-4.5 w-4.5" aria-hidden="true" />
                 </button>
                 <textarea
                   ref={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="max-h-36 min-h-16 flex-1 resize-none overflow-y-auto border-none bg-transparent px-1 py-2 text-base leading-6 text-slate-900 placeholder:text-slate-400 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  className="max-h-24 min-h-10 flex-1 resize-none overflow-y-auto border-none bg-transparent px-1 py-1 text-sm leading-5 text-slate-900 placeholder:text-slate-400 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-500"
                   placeholder={isLoading ? 'AI is composing a structured answer...' : 'Ask for analysis, summary, or next actions...'}
                   rows={2}
                 />
-                <button className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300" title="Voice input" type="button">
-                  <Mic className="h-5 w-5" aria-hidden="true" />
+                <button className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300" title="Voice input" type="button">
+                  <Mic className="h-4.5 w-4.5" aria-hidden="true" />
                 </button>
                 <button
                   onClick={handleSend}
                   disabled={!inputValue.trim() || isLoading}
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-lg shadow-violet-600/25 transition-all hover:-translate-y-0.5 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 dark:focus:ring-offset-slate-950"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-lg shadow-violet-600/25 transition-all hover:-translate-y-0.5 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 dark:focus:ring-offset-slate-950"
                   type="button"
                 >
-                  <Send className="h-5 w-5" aria-hidden="true" />
+                  <Send className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
             </div>
