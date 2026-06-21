@@ -44,6 +44,7 @@ import {
   sendMessage,
 } from '../store/chatSlice';
 import { toggleRecentConversations } from '../store/appSlice';
+import { MarkdownMessage } from '../components/MarkdownMessage';
 import { api } from '../services/api';
 import { agentApi } from '../services/agentApi';
 import type { AgentProfile } from '../types/agent.types';
@@ -128,8 +129,6 @@ interface AssistantResponseProps {
 }
 
 const AssistantResponse: React.FC<AssistantResponseProps> = ({ message, onUsePrompt, assistantLabel }) => {
-  const hasHtml = message.content.includes('<div');
-
   return (
     <article className="group flex w-full max-w-[44rem] items-start gap-2.5">
       <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 via-indigo-600 to-teal-600 text-white shadow-lg shadow-violet-500/20">
@@ -145,17 +144,12 @@ const AssistantResponse: React.FC<AssistantResponseProps> = ({ message, onUsePro
           </span>
         </div>
         <div className="prose prose-sm max-w-none text-[13px] text-slate-700 dark:prose-invert dark:text-slate-200">
-          {hasHtml ? (
-            <div className="ai-response-content" dangerouslySetInnerHTML={{ __html: message.content }} />
-          ) : (
-            <p className="whitespace-pre-wrap leading-6">{message.content}</p>
-          )}
+          <MarkdownMessage content={message.content} />
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-200/70 pt-2.5 dark:border-slate-800">
             {[
               { label: 'Summarize', icon: Sparkles, prompt: 'Summarize the previous answer.' },
               { label: 'Explain', icon: Lightbulb, prompt: 'Explain the previous answer more simply.' },
-              { label: 'Actions', icon: CheckCircle2, prompt: 'Turn the previous answer into next actions.' },
             ].map((action) => {
               const Icon = action.icon;
               return (
