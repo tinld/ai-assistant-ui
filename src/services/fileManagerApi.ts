@@ -1,6 +1,6 @@
 import type { AxiosProgressEvent, AxiosRequestConfig } from 'axios';
 import { api, createApiAxiosInstance } from './api';
-import type { FileItem } from '../types/file.types';
+import type { FileItem, FileSyncResponse, FileUploadResponse } from '../types/file.types';
 
 const axiosInstance = createApiAxiosInstance();
 
@@ -9,7 +9,7 @@ const authHeaders = (token?: string | null): Record<string, string> => (
 );
 
 export const fileManagerApi = {
-  uploadFile: async (file: File, token?: string | null, onProgress?: (progress: number) => void) => {
+  uploadFile: async (file: File, token?: string | null, onProgress?: (progress: number) => void): Promise<FileUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -22,7 +22,7 @@ export const fileManagerApi = {
         }
       },
     };
-    const response = await axiosInstance.post('/api/files/upload', formData, config);
+    const response = await axiosInstance.post<FileUploadResponse>('/api/files/upload', formData, config);
     return response.data;
   },
 
@@ -43,7 +43,7 @@ export const fileManagerApi = {
     return api.delete<{ message: string }>(`/api/files/${fileId}`, token);
   },
 
-  syncToKnowledgeBase: async (fileId: string, token?: string | null) => {
-    return api.post<{ document_id?: string; search_enabled?: boolean; file?: FileItem }>('/api/files/sync_to_kb', { file_id: fileId }, token);
+  syncToKnowledgeBase: async (fileId: string, token?: string | null): Promise<FileSyncResponse> => {
+    return api.post<FileSyncResponse>('/api/files/sync_to_kb', { file_id: fileId }, token);
   }
 };

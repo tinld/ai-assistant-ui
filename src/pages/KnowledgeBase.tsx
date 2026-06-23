@@ -7,6 +7,7 @@ import { formatBytes } from '../utils/formatters';
 import { getFileIcon } from '../utils/file.utils';
 import { StatusBadge } from '../components/StatusBadge';
 import { NotificationToast, type NotificationToastData } from '../components/NotificationToast';
+import { CHAT_ATTACHMENT_ACCEPT, SUPPORTED_KNOWLEDGE_FILE_TYPES_LABEL } from '../constants/file.constants';
 import { Navigate } from 'react-router-dom';
 
 export const KnowledgeBase: React.FC = () => {
@@ -255,7 +256,7 @@ export const KnowledgeBase: React.FC = () => {
             ref={fileInputRef}
             hidden
             onChange={(e) => processFiles(e.target.files)}
-            accept=".pdf,.doc,.docx,.csv,.txt"
+            accept={CHAT_ATTACHMENT_ACCEPT}
           />
         </div>
 
@@ -347,7 +348,7 @@ export const KnowledgeBase: React.FC = () => {
               </div>
               <h3 className="text-lg font-bold text-on-surface dark:text-slate-200">Drag & drop files here</h3>
               <p className="text-on-surface-variant dark:text-slate-400 mt-1 mb-4 text-center max-w-md">
-                Support PDF, DOCX, CSV, and TXT files up to 50MB each. Documents will be automatically indexed for AI retrieval.
+                Support {SUPPORTED_KNOWLEDGE_FILE_TYPES_LABEL} files up to 50MB each. Documents will be automatically indexed for AI retrieval.
               </p>
               <button onClick={() => fileInputRef.current?.click()} className="text-violet-600 dark:text-violet-400 font-medium hover:underline cursor-pointer">Browse files from computer</button>
             </div>

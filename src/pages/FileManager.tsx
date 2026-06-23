@@ -7,16 +7,17 @@ import type { RootState } from '../store';
 import { addUploadTask, updateUploadProgress, updateUploadStatus } from '../store/uploadSlice';
 import type { FileManagerDocument } from '../types/file.types';
 import { formatBytes } from '../utils/formatters';
-import { getFileIcon } from '../utils/file.utils';
+import { getFileExtension, getFileIcon, isSupportedKnowledgeFileType } from '../utils/file.utils';
 import { StatusBadge } from '../components/StatusBadge';
 import { NotificationToast, type NotificationToastData } from '../components/NotificationToast';
+import {
+  FILE_MANAGER_UPLOAD_MAX_SIZE_BYTES,
+  FILE_MANAGER_UPLOAD_MAX_SIZE_LABEL,
+  SUPPORTED_KNOWLEDGE_FILE_TYPES_LABEL,
+} from '../constants/file.constants';
 
 type LibraryView = 'all' | 'synced' | 'ready' | 'unsupported';
 type DisplayMode = 'titles' | 'contents' | 'details';
-
-const SUPPORTED_SYNC_TYPES = ['pdf', 'doc', 'docx', 'csv', 'txt', 'md'];
-
-const getDocumentType = (name: string) => name.split('.').pop()?.toLowerCase() || 'unknown';
 
 const humanizeLabel = (value: string): string => (
   value
@@ -181,7 +182,7 @@ export const FileManager: React.FC = () => {
         ? filesResult.data.files.map(f => ({
           ...f,
           source_file_id: f.source_file_id ?? f.id,
-          type: getDocumentType(f.name),
+          type: getFileExtension(f.name),
           status: f.status || (f.in_kb ? 'indexed' : 'uploaded')
         }))
         : [];
@@ -216,14 +217,14 @@ export const FileManager: React.FC = () => {
 
   const stats = useMemo(() => {
     const kbDocs = documents.filter(doc => doc.in_kb);
-    const readyDocs = documents.filter(doc => SUPPORTED_SYNC_TYPES.includes(doc.type) && !doc.in_kb);
+    const readyDocs = documents.filter(doc => isSupportedKnowledgeFileType(doc.type) && !doc.in_kb);
     const totalStorage = documents.reduce((sum, doc) => sum + doc.size, 0);
 
     return {
       total: documents.length,
       synced: kbDocs.length,
       ready: readyDocs.length,
-      unsupported: documents.filter(doc => !SUPPORTED_SYNC_TYPES.includes(doc.type)).length,
+      unsupported: documents.filter(doc => !isSupportedKnowledgeFileType(doc.type)).length,
       storage: totalStorage
     };
   }, [documents]);
@@ -232,7 +233,7 @@ export const FileManager: React.FC = () => {
     const normalizedSearch = search.trim().toLowerCase();
 
     return displayDocs.filter(doc => {
-      const isSupported = SUPPORTED_SYNC_TYPES.includes(doc.type);
+      const isSupported = isSupportedKnowledgeFileType(doc.type);
       const domain = getDocumentDomain(doc)?.toLowerCase() ?? '';
       const classification = getDocumentClassification(doc).toLowerCase();
       const matchesSearch = !normalizedSearch
@@ -259,8 +260,8 @@ export const FileManager: React.FC = () => {
 
     const file = files[0];
 
-    if (file.size > 50 * 1024 * 1024) {
-      setError(`File "${file.name}" exceeds the 50MB limit.`);
+    if (file.size > FILE_MANAGER_UPLOAD_MAX_SIZE_BYTES) {
+      setError(`File "${file.name}" exceeds the ${FILE_MANAGER_UPLOAD_MAX_SIZE_LABEL} limit.`);
       return;
     }
 
@@ -304,8 +305,8 @@ export const FileManager: React.FC = () => {
   };
 
   const handleSyncToAI = async (docId: string, docType: string) => {
-    if (!SUPPORTED_SYNC_TYPES.includes(docType)) {
-      setError(`Cannot sync .${docType} files to AI context. Supported: PDF, DOCX, CSV, TXT, MD.`);
+    if (!isSupportedKnowledgeFileType(docType)) {
+      setError(`Cannot sync .${docType} files to AI context. Supported: ${SUPPORTED_KNOWLEDGE_FILE_TYPES_LABEL}.`);
       return;
     }
 
@@ -569,7 +570,7 @@ export const FileManager: React.FC = () => {
         const isBusy = deletingKeysRef.current.has(actionKey) || renamingKeysRef.current.has(actionKey);
         const documentId = getKnowledgeDocumentId(activeDocument);
         const isSearchEnabled = activeDocument.search_enabled !== false;
-        const isSupported = SUPPORTED_SYNC_TYPES.includes(activeDocument.type);
+        const isSupported = isSupportedKnowledgeFileType(activeDocument.type);
 
         return (
           <div
@@ -832,7 +833,7 @@ export const FileManager: React.FC = () => {
               <span className="material-symbols-outlined text-emerald-500">playlist_add_check</span>
             </div>
             <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-3">{stats.ready}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">PDF, DOCX, CSV, TXT, MD</p>
+            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{SUPPORTED_KNOWLEDGE_FILE_TYPES_LABEL}</p>
           </div>
 
           <div className="bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-800 rounded-lg p-4">
@@ -863,7 +864,7 @@ export const FileManager: React.FC = () => {
               <div>
                 <h3 className="text-base font-bold text-on-surface dark:text-slate-100">Drop files into storage</h3>
                 <p className="text-sm text-on-surface-variant dark:text-slate-400 mt-1 max-w-2xl">
-                  Uploaded files stay available here. PDF, DOCX, CSV, TXT, and MD files can be synced to AI when needed.
+                  Uploaded files stay available here. {SUPPORTED_KNOWLEDGE_FILE_TYPES_LABEL} files can be synced to AI when needed.
                 </p>
               </div>
             </div>
@@ -1105,7 +1106,7 @@ export const FileManager: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredDocs.map(doc => {
-              const isSupported = SUPPORTED_SYNC_TYPES.includes(doc.type);
+              const isSupported = isSupportedKnowledgeFileType(doc.type);
               const domain = getDocumentDomain(doc);
               const classification = getDocumentClassification(doc);
 

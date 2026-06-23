@@ -31,6 +31,18 @@ export interface FileItem {
   metadata?: FileMetadata | null;
 }
 
+export interface FileUploadResponse {
+  success: boolean;
+  file: FileItem;
+}
+
+export interface FileSyncResponse {
+  success?: boolean;
+  document_id?: string;
+  search_enabled?: boolean;
+  file?: Partial<FileItem>;
+}
+
 export interface FileManagerDocument extends FileItem {
   type: string;
   status: 'indexed' | 'processing' | 'failed' | 'uploading' | 'uploaded';

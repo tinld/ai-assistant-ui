@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Layers3,
   Lightbulb,
+  LoaderCircle,
   MessageSquarePlus,
   Mic,
   MoreHorizontal,
@@ -44,11 +45,20 @@ import {
   sendMessage,
 } from '../store/chatSlice';
 import { toggleRecentConversations } from '../store/appSlice';
+import {
+  CHAT_BOTTOM_THRESHOLD_PX,
+  CHAT_CACHED_MESSAGE_LIMIT,
+  CHAT_HISTORY_SCROLL_THRESHOLD_PX,
+} from '../constants/chat.constants';
+import { CHAT_ATTACHMENT_ACCEPT, CHAT_ATTACHMENT_MAX_SIZE_LABEL } from '../constants/file.constants';
+import { ChatAttachmentChip } from '../components/ChatAttachmentChip';
 import { MarkdownMessage } from '../components/MarkdownMessage';
+import { useChatAttachment } from '../hooks/useChatAttachment';
 import { api } from '../services/api';
 import { agentApi } from '../services/agentApi';
 import type { AgentProfile } from '../types/agent.types';
 import type { Message } from '../types/chat.types';
+import { formatBytes } from '../utils/formatters';
 
 const starterPrompts = [
   {
@@ -183,6 +193,13 @@ const UserMessage: React.FC<UserMessageProps> = ({ message, fallbackInitial }) =
       </div>
       <div className="rounded-xl rounded-tr-md bg-slate-900 px-3.5 py-2.5 text-[13px] leading-6 text-white shadow-[0_12px_32px_rgba(15,23,42,0.14)] dark:bg-slate-100 dark:text-slate-950">
         <p className="whitespace-pre-wrap">{message.content}</p>
+        {message.files?.map((file) => (
+          <div key={`${file.name}-${file.size}`} className="mt-2 flex items-center gap-2 rounded-lg bg-white/10 px-2.5 py-2 text-xs dark:bg-slate-900/10">
+            <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate font-semibold">{file.name}</span>
+            <span className="shrink-0 opacity-70">{file.size}</span>
+          </div>
+        ))}
       </div>
     </div>
   </article>
@@ -190,10 +207,28 @@ const UserMessage: React.FC<UserMessageProps> = ({ message, fallbackInitial }) =
 
 export const Chat: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { conversations, activeConversationId, messages, isLoading, error } = useSelector((state: RootState) => state.chat);
+  const {
+    conversations,
+    activeConversationId,
+    messages,
+    isLoading,
+    isHistoryLoading,
+    isOlderHistoryLoading,
+    historyHasMore,
+    historyError,
+    error,
+  } = useSelector((state: RootState) => state.chat);
   const isRecentConversationsOpen = useSelector((state: RootState) => state.app.isRecentConversationsOpen);
   const user = useSelector((state: RootState) => state.auth.user);
   const token = useSelector((state: RootState) => state.auth.token);
+  const {
+    attachment,
+    fileInputRef,
+    isAttachmentBusy,
+    openFilePicker,
+    clearAttachment,
+    handleFileSelection,
+  } = useChatAttachment(token);
 
   const [inputValue, setInputValue] = useState('');
   const [chatMode, setChatMode] = useState('auto');
@@ -205,8 +240,14 @@ export const Chat: React.FC = () => {
   const [editingTopic, setEditingTopic] = useState('');
   const [isAgentPickerOpen, setIsAgentPickerOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const agentPickerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const isPrependingHistoryRef = useRef(false);
+  const historyRequestPendingRef = useRef(false);
+  const shouldScrollToBottomRef = useRef(true);
+  const previousScrollTopRef = useRef(0);
   const selectedAgent = useMemo(
     () => agents.find((agent) => agent.agent_id === selectedAgentId) ?? null,
     [agents, selectedAgentId]
@@ -226,7 +267,11 @@ export const Chat: React.FC = () => {
   );
 
   useEffect(() => {
-    localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(conversations));
+    const cachedConversations = conversations.map((conversation) => ({
+      ...conversation,
+      messages: conversation.messages.slice(-CHAT_CACHED_MESSAGE_LIMIT),
+    }));
+    localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(cachedConversations));
 
     if (activeConversationId) {
       localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, activeConversationId);
@@ -236,7 +281,7 @@ export const Chat: React.FC = () => {
   }, [activeConversationId, conversations]);
 
   useEffect(() => {
-    dispatch(fetchHistory());
+    dispatch(fetchHistory({ mode: 'initial' }));
 
     const checkSettings = async () => {
       try {
@@ -298,23 +343,73 @@ export const Chat: React.FC = () => {
     };
   }, [isAgentPickerOpen]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  useEffect(() => {
+    if (isPrependingHistoryRef.current) return;
+    if (!shouldScrollToBottomRef.current && !isNearBottomRef.current) return;
+
+    messagesEndRef.current?.scrollIntoView({
+      behavior: shouldScrollToBottomRef.current ? 'auto' : 'smooth',
+    });
+    shouldScrollToBottomRef.current = false;
+  }, [activeConversationId, isHistoryLoading, isLoading, messages.length]);
+
+  const loadOlderHistory = async (container: HTMLDivElement): Promise<void> => {
+    if (!activeConversationId || !historyHasMore || isHistoryLoading || isOlderHistoryLoading) return;
+    if (historyRequestPendingRef.current) return;
+
+    historyRequestPendingRef.current = true;
+    isPrependingHistoryRef.current = true;
+    const previousScrollHeight = container.scrollHeight;
+    const previousScrollTop = container.scrollTop;
+
+    try {
+      await dispatch(fetchHistory({
+        mode: 'older',
+        conversationLocalId: activeConversationId,
+      })).unwrap();
+
+      requestAnimationFrame(() => {
+        container.scrollTop = previousScrollTop + container.scrollHeight - previousScrollHeight;
+        previousScrollTopRef.current = container.scrollTop;
+        isPrependingHistoryRef.current = false;
+        historyRequestPendingRef.current = false;
+      });
+    } catch {
+      isPrependingHistoryRef.current = false;
+      historyRequestPendingRef.current = false;
+    }
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading]);
+  const handleMessagesScroll = (): void => {
+    const container = messagesScrollRef.current;
+    if (!container) return;
+
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isScrollingUp = container.scrollTop < previousScrollTopRef.current;
+    previousScrollTopRef.current = container.scrollTop;
+    isNearBottomRef.current = distanceFromBottom <= CHAT_BOTTOM_THRESHOLD_PX;
+
+    if (isScrollingUp && container.scrollTop <= CHAT_HISTORY_SCROLL_THRESHOLD_PX) {
+      void loadOlderHistory(container);
+    }
+  };
 
   const handleSend = async () => {
     if (!inputValue.trim()) return;
 
     const messageContent = inputValue.trim();
+    const readyAttachment = attachment?.status === 'ready' ? attachment : null;
     setInputValue('');
+    shouldScrollToBottomRef.current = true;
 
     dispatch(addLocalMessage({
       role: 'user',
       content: messageContent,
+      files: readyAttachment ? [{
+        name: readyAttachment.name,
+        size: formatBytes(readyAttachment.size),
+        type: readyAttachment.type,
+      }] : undefined,
       agentId: selectedAgentId || undefined,
       modelLabel: selectedAgent?.name ?? 'Default agent',
     }));
@@ -325,6 +420,8 @@ export const Chat: React.FC = () => {
       agentId: selectedAgentId || undefined,
       modelLabel: selectedAgent?.name ?? 'Default agent',
     }));
+
+    if (readyAttachment) clearAttachment();
   };
 
   const handleUsePrompt = (prompt: string): void => {
@@ -367,7 +464,11 @@ export const Chat: React.FC = () => {
   };
 
   const handleSelectConversation = (conversationId: string): void => {
+    shouldScrollToBottomRef.current = true;
+    isNearBottomRef.current = true;
+    previousScrollTopRef.current = 0;
     dispatch(selectChatConversation(conversationId));
+    dispatch(fetchHistory({ mode: 'initial', conversationLocalId: conversationId }));
     setOpenConversationMenuId(null);
     setEditingConversationId(null);
   };
@@ -594,9 +695,36 @@ export const Chat: React.FC = () => {
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4 scroll-smooth sm:px-5 lg:px-6">
+        <div
+          ref={messagesScrollRef}
+          onScroll={handleMessagesScroll}
+          className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4 sm:px-5 lg:px-6"
+        >
           <div className="mx-auto flex max-w-6xl flex-col gap-4">
-            {messages.length === 0 && !isLoading ? (
+            {(isHistoryLoading || isOlderHistoryLoading) && (
+              <div className="flex h-8 items-center justify-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                {isOlderHistoryLoading ? 'Loading earlier messages' : 'Loading conversation'}
+              </div>
+            )}
+
+            {historyError && !isHistoryLoading && !isOlderHistoryLoading && (
+              <div className="flex items-center justify-center gap-2 text-xs text-red-600 dark:text-red-300">
+                <span>{historyError}</span>
+                <button
+                  type="button"
+                  className="font-bold underline underline-offset-2"
+                  onClick={() => dispatch(fetchHistory({
+                    mode: historyHasMore ? 'older' : 'initial',
+                    conversationLocalId: activeConversationId ?? undefined,
+                  }))}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {messages.length === 0 && !isLoading && !isHistoryLoading ? (
               <div className="grid min-h-full content-center gap-6 py-6">
                 <div className="max-w-3xl">
                   <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white/78 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-violet-700 shadow-sm backdrop-blur dark:border-violet-900/60 dark:bg-slate-950/78 dark:text-violet-300">
@@ -842,8 +970,25 @@ export const Chat: React.FC = () => {
                 </button>
               </div>
 
+              {attachment && (
+                <ChatAttachmentChip attachment={attachment} onRemove={clearAttachment} />
+              )}
+
               <div className="flex items-center gap-1 pt-1">
-                <button className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300" title="Attach file" type="button">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={CHAT_ATTACHMENT_ACCEPT}
+                  onChange={(event) => void handleFileSelection(event)}
+                  className="hidden"
+                />
+                <button
+                  onClick={openFilePicker}
+                  disabled={Boolean(attachment)}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300"
+                  title={attachment ? 'Remove the current attachment first' : `Attach and sync a file (${CHAT_ATTACHMENT_MAX_SIZE_LABEL} max)`}
+                  type="button"
+                >
                   <Paperclip className="h-4.5 w-4.5" aria-hidden="true" />
                 </button>
                 <textarea
@@ -852,7 +997,7 @@ export const Chat: React.FC = () => {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="max-h-24 min-h-10 flex-1 resize-none overflow-y-auto border-none bg-transparent px-1 py-1 text-sm leading-5 text-slate-900 placeholder:text-slate-400 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-500"
-                  placeholder={isLoading ? 'AI is composing a structured answer...' : 'Ask for analysis, summary, or next actions...'}
+                  placeholder={isAttachmentBusy ? 'Preparing your file...' : isLoading ? 'AI is composing a structured answer...' : 'Ask for analysis, summary, or next actions...'}
                   rows={2}
                 />
                 <button className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300" title="Voice input" type="button">
@@ -860,7 +1005,7 @@ export const Chat: React.FC = () => {
                 </button>
                 <button
                   onClick={handleSend}
-                  disabled={!inputValue.trim() || isLoading}
+                  disabled={!inputValue.trim() || isLoading || isAttachmentBusy}
                   className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-lg shadow-violet-600/25 transition-all hover:-translate-y-0.5 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 dark:focus:ring-offset-slate-950"
                   type="button"
                 >

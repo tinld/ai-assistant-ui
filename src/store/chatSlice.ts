@@ -1,7 +1,15 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
+import { CHAT_CACHED_MESSAGE_LIMIT, CHAT_HISTORY_PAGE_SIZE } from '../constants/chat.constants';
 import { api, ApiError } from '../services/api';
 import type { RootState } from './index';
-import type { ChatConversation, ChatState, Message, SendMessageInput } from '../types/chat.types';
+import type {
+  ChatConversation,
+  ChatHistoryResponse,
+  ChatState,
+  FetchChatHistoryInput,
+  Message,
+  SendMessageInput,
+} from '../types/chat.types';
 
 const CONVERSATIONS_STORAGE_KEY = 'ai-concierge-chat-conversations';
 const ACTIVE_CONVERSATION_STORAGE_KEY = 'ai-concierge-active-chat-id';
@@ -49,6 +57,7 @@ const readStoredConversations = (): { conversations: ChatConversation[]; activeC
           .filter((conversation) => conversation?.id && Array.isArray(conversation.messages))
           .map((conversation) => ({
             ...conversation,
+            messages: conversation.messages.slice(-CHAT_CACHED_MESSAGE_LIMIT),
             backendConversationId: conversation.backendConversationId,
             topic: conversation.topic || getConversationTopic(conversation.messages),
             modelLabel: conversation.modelLabel || 'Default agent',
@@ -69,6 +78,28 @@ const readStoredConversations = (): { conversations: ChatConversation[]; activeC
 
 const getActiveConversation = (state: ChatState): ChatConversation | undefined =>
   state.conversations.find((conversation) => conversation.id === state.activeConversationId);
+
+const getConversation = (state: ChatState, conversationId?: string): ChatConversation | undefined =>
+  conversationId
+    ? state.conversations.find((conversation) => conversation.id === conversationId)
+    : getActiveConversation(state);
+
+const mergeOlderMessages = (currentMessages: Message[], olderMessages: Message[]): Message[] => {
+  const knownIds = new Set(currentMessages.map((message) => message.id).filter(Boolean));
+  const uniqueOlderMessages = olderMessages.filter((message) => !message.id || !knownIds.has(message.id));
+  return [...uniqueOlderMessages, ...currentMessages];
+};
+
+const resetHistoryPagination = (state: ChatState): void => {
+  state.isHistoryLoading = false;
+  state.isOlderHistoryLoading = false;
+  state.historyHasMore = false;
+  state.historyCursor = null;
+  state.historyConversationId = null;
+  state.historyRequestId = null;
+  state.olderHistoryRequestId = null;
+  state.historyError = null;
+};
 
 const ensureActiveConversation = (state: ChatState): ChatConversation => {
   const activeConversation = getActiveConversation(state);
@@ -111,38 +142,54 @@ const initialState: ChatState = {
   activeConversationId: storedState.activeConversationId,
   messages: initialActiveConversation?.messages ?? [],
   isLoading: false,
+  isHistoryLoading: false,
+  isOlderHistoryLoading: false,
+  historyHasMore: false,
+  historyCursor: null,
+  historyConversationId: null,
+  historyRequestId: null,
+  olderHistoryRequestId: null,
+  historyError: null,
   error: null,
 };
 
 export const fetchHistory = createAsyncThunk(
   'chat/fetchHistory',
-  async (_, { getState, rejectWithValue }) => {
+  async (input: FetchChatHistoryInput = {}, { getState, rejectWithValue }) => {
     const state = getState() as RootState;
     const token = state.auth.token;
     if (!token) return rejectWithValue('No token');
-    const activeConversation = getActiveConversation(state.chat);
+    const loadMode = input.mode ?? 'initial';
+    const conversation = getConversation(state.chat, input.conversationLocalId);
+    const localConversationId = conversation?.id;
 
     try {
-      if (activeConversation && !activeConversation.backendConversationId) {
+      if (conversation && !conversation.backendConversationId) {
         return {
           success: true,
           conversation_id: undefined,
-          history: activeConversation.messages,
+          history: conversation.messages,
           hasMore: false,
           nextCursor: null,
+          loadMode,
+          localConversationId,
         };
       }
-      const endpoint = activeConversation?.backendConversationId
-        ? `/api/chat/history?limit=30&conversation_id=${encodeURIComponent(activeConversation.backendConversationId)}`
-        : '/api/chat/history?limit=30';
-      const response = await api.get<{
-        success: boolean;
-        conversation_id?: string;
-        history: Message[];
-        hasMore?: boolean;
-        nextCursor?: { createdAt: string; _id: string } | null;
-      }>(endpoint, token);
-      return response;
+
+      const query = new URLSearchParams({ limit: String(CHAT_HISTORY_PAGE_SIZE) });
+      if (conversation?.backendConversationId) {
+        query.set('conversation_id', conversation.backendConversationId);
+      }
+      if (loadMode === 'older' && state.chat.historyConversationId === localConversationId) {
+        const cursor = state.chat.historyCursor;
+        if (cursor) {
+          query.set('beforeCreatedAt', cursor.createdAt);
+          query.set('beforeId', cursor._id);
+        }
+      }
+
+      const response = await api.get<ChatHistoryResponse>(`/api/chat/history?${query.toString()}`, token);
+      return { ...response, loadMode, localConversationId };
     } catch (err: unknown) {
       if (err instanceof ApiError) return rejectWithValue(err.message);
       return rejectWithValue('Failed to fetch history');
@@ -237,6 +284,7 @@ const chatSlice = createSlice({
         state.activeConversationId = existingEmptyConversation.id;
         state.messages = [];
         state.error = null;
+        resetHistoryPagination(state);
         return;
       }
 
@@ -248,12 +296,14 @@ const chatSlice = createSlice({
       state.activeConversationId = conversation.id;
       state.messages = [];
       state.error = null;
+      resetHistoryPagination(state);
     },
     selectChatConversation: (state, action: PayloadAction<string>) => {
       if (!state.conversations.some((conversation) => conversation.id === action.payload)) return;
 
       state.activeConversationId = action.payload;
       state.error = null;
+      resetHistoryPagination(state);
       syncActiveMessages(state);
     },
     renameChatConversation: (state, action: PayloadAction<{ id: string; topic: string }>) => {
@@ -278,6 +328,7 @@ const chatSlice = createSlice({
       }
 
       state.error = null;
+      resetHistoryPagination(state);
       syncActiveMessages(state);
     },
     clearActiveConversation: (state) => {
@@ -287,16 +338,36 @@ const chatSlice = createSlice({
       activeConversation.updatedAt = nowIso();
       state.messages = [];
       state.error = null;
+      resetHistoryPagination(state);
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchHistory.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
+      .addCase(fetchHistory.pending, (state, action) => {
+        const loadMode = action.meta.arg?.mode ?? 'initial';
+        state.historyError = null;
+        if (loadMode === 'older') {
+          state.isOlderHistoryLoading = true;
+          state.olderHistoryRequestId = action.meta.requestId;
+        } else {
+          state.isHistoryLoading = true;
+          state.historyRequestId = action.meta.requestId;
+        }
       })
       .addCase(fetchHistory.fulfilled, (state, action) => {
-        state.isLoading = false;
+        const loadMode = action.payload.loadMode;
+        const isCurrentRequest = loadMode === 'older'
+          ? state.olderHistoryRequestId === action.meta.requestId
+          : state.historyRequestId === action.meta.requestId;
+        if (!isCurrentRequest) return;
+
+        if (loadMode === 'older') {
+          state.isOlderHistoryLoading = false;
+          state.olderHistoryRequestId = null;
+        } else {
+          state.isHistoryLoading = false;
+          state.historyRequestId = null;
+        }
 
         if (state.conversations.length === 0 && action.payload?.history?.length) {
           const conversation = createConversation({
@@ -306,15 +377,6 @@ const chatSlice = createSlice({
           });
           state.conversations.push(conversation);
           state.activeConversationId = conversation.id;
-        } else if (action.payload?.conversation_id) {
-          const activeConversation = ensureActiveConversation(state);
-          if (!activeConversation.backendConversationId) {
-            activeConversation.backendConversationId = action.payload.conversation_id;
-          }
-          if (activeConversation.messages.length === 0) {
-            activeConversation.messages = action.payload.history ?? [];
-            activeConversation.topic = getConversationTopic(activeConversation.messages, activeConversation.topic);
-          }
         }
 
         if (state.conversations.length === 0) {
@@ -323,11 +385,38 @@ const chatSlice = createSlice({
           state.activeConversationId = conversation.id;
         }
 
+        const targetConversation = getConversation(state, action.payload.localConversationId);
+        if (targetConversation) {
+          if (action.payload.conversation_id) {
+            targetConversation.backendConversationId = action.payload.conversation_id;
+          }
+          targetConversation.messages = loadMode === 'older'
+            ? mergeOlderMessages(targetConversation.messages, action.payload.history ?? [])
+            : action.payload.history ?? [];
+          targetConversation.topic = getConversationTopic(targetConversation.messages, targetConversation.topic);
+        }
+
+        state.historyConversationId = targetConversation?.id ?? state.activeConversationId;
+        state.historyHasMore = Boolean(action.payload.hasMore);
+        state.historyCursor = action.payload.nextCursor ?? null;
+
         syncActiveMessages(state);
       })
       .addCase(fetchHistory.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
+        const loadMode = action.meta.arg?.mode ?? 'initial';
+        const isCurrentRequest = loadMode === 'older'
+          ? state.olderHistoryRequestId === action.meta.requestId
+          : state.historyRequestId === action.meta.requestId;
+        if (!isCurrentRequest) return;
+
+        if (loadMode === 'older') {
+          state.isOlderHistoryLoading = false;
+          state.olderHistoryRequestId = null;
+        } else {
+          state.isHistoryLoading = false;
+          state.historyRequestId = null;
+        }
+        state.historyError = action.payload as string;
       })
       .addCase(sendMessage.pending, (state) => {
         state.isLoading = true;
@@ -359,6 +448,7 @@ const chatSlice = createSlice({
         activeConversation.topic = 'New chat';
         activeConversation.updatedAt = nowIso();
         state.messages = [];
+        resetHistoryPagination(state);
       });
   },
 });
