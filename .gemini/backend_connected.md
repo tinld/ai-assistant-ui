@@ -178,6 +178,42 @@ GET /api/chat/history?conversation_id=<id>&limit=30&beforeCreatedAt=<timestamp>&
 
 History responses include `history`, `items`, `nextCursor`, and `hasMore`.
 
+### Analytics
+
+```text
+GET /api/analytics/usage?range=<today|7d|30d|year>
+```
+
+The Analytics page uses this endpoint for real conversation reporting. The backend aggregates from `chat_messages` and `chat_conversations`, so the frontend must not fetch full chat history for reporting.
+
+Response shape:
+
+```json
+{
+  "success": true,
+  "report": {
+    "range": "7d",
+    "startAt": "2026-06-18T00:00:00+00:00",
+    "endAt": "2026-06-25T00:00:00+00:00",
+    "summary": {
+      "totalConversations": 0,
+      "totalMessages": 0,
+      "userMessages": 0,
+      "assistantMessages": 0,
+      "estimatedTokens": 0,
+      "activeDays": 0,
+      "avgMessagesPerConversation": 0
+    },
+    "dailyUsage": [],
+    "roleBreakdown": [],
+    "recentActivity": [],
+    "topConversations": []
+  }
+}
+```
+
+`estimatedTokens` is calculated from saved message text length. It is a usage estimate, not provider billing telemetry.
+
 ### Agents And Models
 
 ```text

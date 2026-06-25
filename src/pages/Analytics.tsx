@@ -1,194 +1,322 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
-import type { RootState } from '../store';
 import {
-  LineChart,
-  Line,
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend
 } from 'recharts';
 
-const CHART_DATA = [
-  { name: 'Mon', conversations: 120, tokens: 14000 },
-  { name: 'Tue', conversations: 180, tokens: 22000 },
-  { name: 'Wed', conversations: 250, tokens: 35000 },
-  { name: 'Thu', conversations: 210, tokens: 28000 },
-  { name: 'Fri', conversations: 190, tokens: 24000 },
-  { name: 'Sat', conversations: 90, tokens: 11000 },
-  { name: 'Sun', conversations: 60, tokens: 8000 },
-];
+import { ANALYTICS_RANGE_OPTIONS, ANALYTICS_REFRESH_INTERVAL_MS, type AnalyticsRange } from '../constants/analytics.constants';
+import { analyticsApi } from '../services/analyticsApi';
+import type { RootState } from '../store';
+import type { AnalyticsReport } from '../types/analytics.types';
 
-const CATEGORY_DATA = [
-  { name: 'General QA', value: 45000 },
-  { name: 'Coding Assistance', value: 38000 },
-  { name: 'Data Analysis', value: 25000 },
-  { name: 'Document Summarization', value: 18000 },
-  { name: 'Creative Writing', value: 12000 },
-];
+interface TooltipPayload {
+  name?: string;
+  value?: number | string;
+  color?: string;
+}
 
-const RECENT_ACTIVITY = [
-  { id: '1', query: 'Write a React component with Tailwind...', type: 'Coding', tokens: 840, time: '10:45 AM', status: 'Success' },
-  { id: '2', query: 'Summarize the Q3 Financial Report...', type: 'Doc Summary', tokens: 4250, time: '10:12 AM', status: 'Success' },
-  { id: '3', query: 'What is the weather in Tokyo?', type: 'General', tokens: 125, time: '09:30 AM', status: 'Success' },
-  { id: '4', query: 'Query PostgreSQL for user signups...', type: 'Data Analysis', tokens: 0, time: '09:15 AM', status: 'Failed' },
-  { id: '5', query: 'Generate an email template for...', type: 'Creative', tokens: 320, time: '08:50 AM', status: 'Success' },
-];
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+}
 
-export const Analytics: React.FC = () => {
-  const [dateRange, setDateRange] = useState('Last 7 Days');
-  const theme = useSelector((state: RootState) => state.app.theme);
-  
-  // Custom colors based on theme
-  const chartColors = {
-    primary: '#7c3aed', // violet-600
-    secondary: '#38bdf8', // sky-400
-    grid: theme === 'dark' ? '#334155' : '#e2e8f0', // slate-700 / slate-200
-    text: theme === 'dark' ? '#94a3b8' : '#64748b', // slate-400 / slate-500
-    bg: theme === 'dark' ? '#0f172a' : '#ffffff', // slate-950 / white
-    border: theme === 'dark' ? '#1e293b' : '#f1f5f9', // slate-800 / slate-100
-  };
+interface MetricCard {
+  label: string;
+  value: string;
+  note: string;
+  icon: string;
+  color: string;
+  bg: string;
+}
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg shadow-lg">
-          <p className="font-semibold text-slate-800 dark:text-slate-200 mb-2">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm flex items-center gap-2" style={{ color: entry.color }}>
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
-              {entry.name}: <span className="font-medium">{entry.value.toLocaleString()}</span>
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
+const formatCompactNumber = (value: number): string =>
+  Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+
+const formatNumber = (value: number): string => Intl.NumberFormat('en').format(value);
+
+const formatActivityTime = (value?: string | null): string => {
+  if (!value) return 'Unknown';
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+};
+
+const truncateText = (value: string, maxLength = 90): string =>
+  value.length > maxLength ? `${value.slice(0, maxLength).trim()}...` : value;
+
+const getRoleLabel = (role: string): string => {
+  if (role === 'user') return 'User messages';
+  if (role === 'assistant') return 'Assistant replies';
+  return `${role || 'Other'} messages`;
+};
+
+const createMetricCards = (report: AnalyticsReport | null): MetricCard[] => {
+  const summary = report?.summary;
+  return [
+    {
+      label: 'Conversations',
+      value: formatNumber(summary?.totalConversations ?? 0),
+      note: 'Created in range',
+      icon: 'forum',
+      color: 'text-violet-600 dark:text-violet-400',
+      bg: 'bg-violet-100 dark:bg-violet-900/30',
+    },
+    {
+      label: 'Messages',
+      value: formatNumber(summary?.totalMessages ?? 0),
+      note: `${formatNumber(summary?.userMessages ?? 0)} sent by user`,
+      icon: 'chat_bubble',
+      color: 'text-sky-600 dark:text-sky-400',
+      bg: 'bg-sky-100 dark:bg-sky-900/30',
+    },
+    {
+      label: 'Estimated Tokens',
+      value: formatCompactNumber(summary?.estimatedTokens ?? 0),
+      note: 'Estimated from saved text',
+      icon: 'generating_tokens',
+      color: 'text-emerald-600 dark:text-emerald-400',
+      bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+    },
+    {
+      label: 'Active Days',
+      value: formatNumber(summary?.activeDays ?? 0),
+      note: `${summary?.avgMessagesPerConversation ?? 0} avg messages/conversation`,
+      icon: 'calendar_month',
+      color: 'text-amber-600 dark:text-amber-400',
+      bg: 'bg-amber-100 dark:bg-amber-900/30',
+    },
+  ];
+};
+
+const ChartTooltip: React.FC<ChartTooltipProps> = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
 
   return (
-    <div className="flex-1 bg-surface-bright dark:bg-slate-900 overflow-y-auto font-['Inter'] pb-12">
-      <div className="max-w-7xl mx-auto px-8 py-8 flex flex-col gap-8">
-        
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+      <p className="mb-2 font-semibold text-slate-800 dark:text-slate-200">{label}</p>
+      {payload.map((entry) => (
+        <p key={`${entry.name}-${entry.value}`} className="flex items-center gap-2 text-sm" style={{ color: entry.color }}>
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+          {entry.name}: <span className="font-medium">{formatNumber(Number(entry.value ?? 0))}</span>
+        </p>
+      ))}
+    </div>
+  );
+};
+
+export const Analytics: React.FC = () => {
+  const [dateRange, setDateRange] = useState<AnalyticsRange>('7d');
+  const [report, setReport] = useState<AnalyticsReport | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const theme = useSelector((state: RootState) => state.app.theme);
+  const token = useSelector((state: RootState) => state.auth.token);
+
+  const chartColors = useMemo(
+    () => ({
+      primary: '#7c3aed',
+      secondary: '#0f766e',
+      tertiary: '#ea580c',
+      grid: theme === 'dark' ? '#334155' : '#e2e8f0',
+      text: theme === 'dark' ? '#94a3b8' : '#64748b',
+      border: theme === 'dark' ? '#1e293b' : '#f1f5f9',
+    }),
+    [theme]
+  );
+
+  const metricCards = useMemo(() => createMetricCards(report), [report]);
+  const roleData = useMemo(
+    () => report?.roleBreakdown.map((item) => ({ name: getRoleLabel(item.role), messages: item.messages })) ?? [],
+    [report]
+  );
+  const hasUsage = Boolean(report && report.summary.totalMessages > 0);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadReport = async (): Promise<void> => {
+      if (!token) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const usageReport = await analyticsApi.getUsageReport(dateRange, token);
+        if (isActive) {
+          setReport(usageReport);
+        }
+      } catch {
+        if (isActive) {
+          setError('Unable to load analytics report right now.');
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadReport();
+    const intervalId = window.setInterval(loadReport, ANALYTICS_REFRESH_INTERVAL_MS);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+    };
+  }, [dateRange, reloadToken, token]);
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-surface-bright pb-12 font-['Inter'] dark:bg-slate-900">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-8 lg:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-on-surface dark:text-slate-200">Analytics Dashboard</h1>
-            <p className="text-on-surface-variant dark:text-slate-400 mt-1">Monitor AI assistant usage, token consumption, and performance.</p>
+            <h1 className="text-3xl font-bold text-on-surface dark:text-slate-200">Analytics</h1>
+            <p className="mt-1 text-on-surface-variant dark:text-slate-400">
+              Conversation usage, activity, and estimated message volume from backend history.
+            </p>
           </div>
-          <div className="relative">
-            <select 
+
+          <div className="relative w-full sm:w-48">
+            <select
               value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="appearance-none bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-800 text-on-surface dark:text-slate-200 px-4 py-2.5 pr-10 rounded-lg font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 shadow-sm cursor-pointer"
+              onChange={(event) => setDateRange(event.target.value as AnalyticsRange)}
+              className="w-full appearance-none rounded-lg border border-outline-variant bg-white px-4 py-2.5 pr-10 font-medium text-on-surface shadow-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
             >
-              <option>Today</option>
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
-              <option>This Year</option>
+              {ANALYTICS_RANGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
-            <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+            <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+              expand_more
+            </span>
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            { label: 'Total Conversations', value: '1,100', trend: '+12%', trendUp: true, icon: 'forum', color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30' },
-            { label: 'Tokens Processed', value: '142.5K', trend: '+24%', trendUp: true, icon: 'generating_tokens', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-            { label: 'Avg Response Time', value: '840 ms', trend: '-5%', trendUp: true, icon: 'speed', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30' },
-            { label: 'User Satisfaction', value: '94%', trend: '-1%', trendUp: false, icon: 'thumb_up', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30' },
-          ].map((kpi, idx) => (
-            <div key={idx} className="bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-800 rounded-xl p-5 shadow-sm">
-              <div className="flex justify-between items-start mb-4">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${kpi.bg} ${kpi.color}`}>
-                  <span className="material-symbols-outlined">{kpi.icon}</span>
+        {error && (
+          <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+            <span>{error}</span>
+            <button type="button" onClick={() => setReloadToken((current) => current + 1)} className="font-semibold hover:underline">
+              Retry
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {metricCards.map((metric) => (
+            <div key={metric.label} className="rounded-xl border border-outline-variant bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <div className="mb-4 flex items-start justify-between">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${metric.bg} ${metric.color}`}>
+                  <span className="material-symbols-outlined">{metric.icon}</span>
                 </div>
-                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${kpi.trendUp ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'} flex items-center gap-0.5`}>
-                  <span className="material-symbols-outlined text-[12px]">{kpi.trendUp ? 'trending_up' : 'trending_down'}</span>
-                  {kpi.trend}
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {isLoading ? 'Syncing' : 'Live'}
                 </span>
               </div>
-              <p className="text-sm text-on-surface-variant dark:text-slate-400 font-medium mb-1">{kpi.label}</p>
-              <h3 className="text-2xl font-bold text-on-surface dark:text-slate-200">{kpi.value}</h3>
+              <p className="mb-1 text-sm font-medium text-on-surface-variant dark:text-slate-400">{metric.label}</p>
+              <h3 className="text-2xl font-bold text-on-surface dark:text-slate-200">{metric.value}</h3>
+              <p className="mt-2 text-xs text-on-surface-variant dark:text-slate-500">{metric.note}</p>
             </div>
           ))}
         </div>
 
-        {/* Main Chart */}
-        <div className="bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-800 rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-on-surface dark:text-slate-200 mb-6">Usage Over Time</h3>
+        <div className="rounded-xl border border-outline-variant bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-on-surface dark:text-slate-200">Usage Over Time</h3>
+              <p className="text-sm text-on-surface-variant dark:text-slate-400">Messages and estimated tokens grouped by day.</p>
+            </div>
+          </div>
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={CHART_DATA} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <LineChart data={report?.dailyUsage ?? []} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} vertical={false} />
-                <XAxis dataKey="name" stroke={chartColors.text} tick={{ fill: chartColors.text, fontSize: 12 }} tickLine={false} axisLine={false} dy={10} />
+                <XAxis dataKey="label" stroke={chartColors.text} tick={{ fill: chartColors.text, fontSize: 12 }} tickLine={false} axisLine={false} dy={10} />
                 <YAxis yAxisId="left" stroke={chartColors.text} tick={{ fill: chartColors.text, fontSize: 12 }} tickLine={false} axisLine={false} dx={-10} />
                 <YAxis yAxisId="right" orientation="right" stroke={chartColors.text} tick={{ fill: chartColors.text, fontSize: 12 }} tickLine={false} axisLine={false} dx={10} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<ChartTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                <Line yAxisId="left" type="monotone" dataKey="conversations" name="Conversations" stroke={chartColors.primary} strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                <Line yAxisId="right" type="monotone" dataKey="tokens" name="Tokens Processed" stroke={chartColors.secondary} strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                <Line yAxisId="left" type="monotone" dataKey="messages" name="Messages" stroke={chartColors.primary} strokeWidth={3} dot={{ r: 3, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                <Line yAxisId="right" type="monotone" dataKey="estimatedTokens" name="Estimated tokens" stroke={chartColors.secondary} strokeWidth={3} dot={{ r: 3, strokeWidth: 2 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Lower Section: Bar Chart & Table */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Bar Chart */}
-          <div className="bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-800 rounded-xl p-6 shadow-sm lg:col-span-1 flex flex-col">
-            <h3 className="text-lg font-bold text-on-surface dark:text-slate-200 mb-6">Token Usage by Category</h3>
-            <div className="h-[300px] w-full flex-1">
+        {!hasUsage && !isLoading && (
+          <div className="rounded-xl border border-dashed border-outline-variant bg-white px-6 py-10 text-center dark:border-slate-800 dark:bg-slate-950">
+            <h3 className="text-lg font-semibold text-on-surface dark:text-slate-200">No conversation activity yet</h3>
+            <p className="mt-2 text-sm text-on-surface-variant dark:text-slate-400">Once users chat with agents, this page will show real backend usage data.</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="flex flex-col rounded-xl border border-outline-variant bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <h3 className="mb-6 text-lg font-bold text-on-surface dark:text-slate-200">Message Mix</h3>
+            <div className="h-[280px] w-full flex-1">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={CATEGORY_DATA} layout="vertical" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={true} vertical={false} />
+                <BarChart data={roleData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal vertical={false} />
                   <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" stroke={chartColors.text} tick={{ fill: chartColors.text, fontSize: 12 }} width={120} tickLine={false} axisLine={false} />
-                  <Tooltip cursor={{ fill: chartColors.border }} content={<CustomTooltip />} />
-                  <Bar dataKey="value" name="Tokens" fill={chartColors.primary} radius={[0, 4, 4, 0]} barSize={24} />
+                  <YAxis dataKey="name" type="category" stroke={chartColors.text} tick={{ fill: chartColors.text, fontSize: 12 }} width={130} tickLine={false} axisLine={false} />
+                  <Tooltip cursor={{ fill: chartColors.border }} content={<ChartTooltip />} />
+                  <Bar dataKey="messages" name="Messages" fill={chartColors.tertiary} radius={[0, 4, 4, 0]} barSize={24} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Recent Activity Table */}
-          <div className="bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-800 rounded-xl p-6 shadow-sm lg:col-span-2 overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-on-surface dark:text-slate-200">Recent Activity</h3>
-              <button className="text-sm text-violet-600 dark:text-violet-400 font-medium hover:underline">View All</button>
+          <div className="flex flex-col overflow-hidden rounded-xl border border-outline-variant bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950 lg:col-span-2">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-on-surface dark:text-slate-200">Recent User Prompts</h3>
+              <span className="text-xs font-medium text-on-surface-variant dark:text-slate-500">Latest 8</span>
             </div>
-            
+
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-outline-variant dark:border-slate-800 text-sm text-on-surface-variant dark:text-slate-400">
-                    <th className="pb-3 font-medium px-4">Query / Task</th>
-                    <th className="pb-3 font-medium px-4">Type</th>
-                    <th className="pb-3 font-medium px-4 text-right">Tokens</th>
-                    <th className="pb-3 font-medium px-4">Time</th>
-                    <th className="pb-3 font-medium px-4">Status</th>
+                  <tr className="border-b border-outline-variant text-sm text-on-surface-variant dark:border-slate-800 dark:text-slate-400">
+                    <th className="px-4 pb-3 font-medium">Prompt</th>
+                    <th className="px-4 pb-3 text-right font-medium">Est. Tokens</th>
+                    <th className="px-4 pb-3 font-medium">Time</th>
+                    <th className="px-4 pb-3 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {RECENT_ACTIVITY.map((activity, index) => (
-                    <tr key={activity.id} className={`text-sm ${index !== RECENT_ACTIVITY.length - 1 ? 'border-b border-outline-variant dark:border-slate-800/50' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors`}>
-                      <td className="py-3 px-4 text-on-surface dark:text-slate-200 font-medium truncate max-w-[200px]" title={activity.query}>{activity.query}</td>
-                      <td className="py-3 px-4 text-on-surface-variant dark:text-slate-400 whitespace-nowrap">{activity.type}</td>
-                      <td className="py-3 px-4 text-on-surface-variant dark:text-slate-400 text-right font-mono">{activity.tokens.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-on-surface-variant dark:text-slate-400 whitespace-nowrap">{activity.time}</td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap ${
-                          activity.status === 'Success' 
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                        }`}>
+                  {(report?.recentActivity ?? []).map((activity, index) => (
+                    <tr
+                      key={activity.id}
+                      className={`text-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
+                        index !== (report?.recentActivity.length ?? 0) - 1 ? 'border-b border-outline-variant dark:border-slate-800/50' : ''
+                      }`}
+                    >
+                      <td className="max-w-[360px] px-4 py-3 font-medium text-on-surface dark:text-slate-200" title={activity.query}>
+                        {truncateText(activity.query)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-on-surface-variant dark:text-slate-400">
+                        {formatNumber(activity.estimatedTokens)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant dark:text-slate-400">
+                        {formatActivityTime(activity.createdAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-md bg-green-100 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                           {activity.status}
                         </span>
                       </td>
@@ -198,9 +326,22 @@ export const Analytics: React.FC = () => {
               </table>
             </div>
           </div>
-          
         </div>
 
+        <div className="rounded-xl border border-outline-variant bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <h3 className="mb-4 text-lg font-bold text-on-surface dark:text-slate-200">Most Active Conversations</h3>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {(report?.topConversations ?? []).map((conversation) => (
+              <div key={conversation.id} className="rounded-lg border border-outline-variant p-4 dark:border-slate-800">
+                <p className="text-sm font-semibold text-on-surface dark:text-slate-200">{formatNumber(conversation.messageCount)} messages</p>
+                <p className="mt-2 min-h-10 text-xs text-on-surface-variant dark:text-slate-400">
+                  {truncateText(conversation.lastMessagePreview || 'No preview available', 70)}
+                </p>
+                <p className="mt-3 text-xs text-slate-500">{formatActivityTime(conversation.lastMessageAt)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
