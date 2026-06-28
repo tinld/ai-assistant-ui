@@ -290,6 +290,57 @@ src/store/uploadSlice.ts
 
 The shared Redux upload task allows File Manager to represent in-progress work consistently. Do not build a second storage model specifically for Chat.
 
+### Google Drive
+
+Google Drive reuses the File Manager storage model. Drive is a file source, not a separate file system.
+
+```text
+GET  /api/integrations/google-drive/status
+POST /api/integrations/google-drive/connect
+GET  /api/integrations/google-drive/oauth/callback
+POST /api/integrations/google-drive/disconnect
+GET  /api/google-drive/files?q=<search>&pageToken=<token>
+POST /api/google-drive/sync
+```
+
+`POST /api/google-drive/sync` accepts:
+
+```json
+{
+  "drive_file_id": "google-drive-file-id",
+  "sync_to_kb": true
+}
+```
+
+Google Drive sync downloads or exports the selected Drive file, saves it through `upload_service.save_file`, and optionally calls the existing `sync_to_kb` flow. Synced Drive files appear in `GET /api/files` alongside local uploads.
+
+Drive-sourced file fields can include:
+
+```text
+source = "google_drive"
+source_provider = "google_drive"
+source_file_id
+source_name
+source_mime_type
+source_modified_time
+source_checksum
+source_web_url
+last_source_sync_at
+```
+
+Backend environment required for OAuth:
+
+```text
+FRONTEND_URL
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+GOOGLE_REDIRECT_URI
+GOOGLE_TOKEN_ENCRYPTION_SECRET
+GOOGLE_DRIVE_MAX_SYNC_BYTES
+```
+
+Google Drive file listing must stay paginated and field-limited. Do not fetch all Drive files into the frontend.
+
 ### Settings And Rules
 
 ```text

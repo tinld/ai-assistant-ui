@@ -1,29 +1,26 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
+import { BrandMark } from '../BrandMark';
 
 export const AuthLayout: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-slate-50 to-violet-100 flex items-center justify-center p-4 relative overflow-hidden font-['Inter'] antialiased z-0">
-      {/* Decorative background circles */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-violet-200/50 blur-3xl z-[-1]"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-[30vw] h-[30vw] rounded-full bg-blue-200/50 blur-3xl z-[-1]"></div>
+    <div className="relative z-0 flex min-h-screen items-center justify-center overflow-hidden bg-[linear-gradient(135deg,#f8fafc_0%,#eef6ff_46%,#f6f2ff_100%)] p-4 font-['Inter'] antialiased dark:bg-[linear-gradient(135deg,#020617_0%,#0f172a_48%,#111827_100%)]">
+      <div className="absolute inset-0 z-[-1] bg-[radial-gradient(circle_at_18%_18%,rgba(14,165,233,0.12),transparent_28%),radial-gradient(circle_at_84%_12%,rgba(168,85,247,0.13),transparent_30%),linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[size:auto,auto,44px_44px,44px_44px] dark:bg-[radial-gradient(circle_at_18%_18%,rgba(14,165,233,0.16),transparent_28%),radial-gradient(circle_at_84%_12%,rgba(168,85,247,0.14),transparent_30%),linear-gradient(rgba(148,163,184,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.06)_1px,transparent_1px)]"></div>
       
       <main className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-md">
-            <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center text-white shadow-lg shadow-violet-200">
-              <span className="material-symbols-outlined text-2xl" data-weight="fill" style={{ fontVariationSettings: "'FILL' 1" }}>psychiatry</span>
-            </div>
+            <BrandMark size="lg" />
             <div>
-              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">AI Concierge</h2>
-              <p className="text-sm text-slate-500 font-medium">Violet Trust System</p>
+              <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">Nexa AI</h2>
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Intelligent operating space</p>
             </div>
           </div>
         </div>
 
-        <div className="glass-effect rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl bg-white/70 border border-white/50 p-8 relative">
+        <div className="glass-effect relative overflow-hidden rounded-2xl border border-white/60 bg-white/76 p-8 shadow-[0_28px_80px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-slate-800/70 dark:bg-slate-950/78">
            {/* Ambient top light */}
-           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-gradient-to-r from-transparent via-violet-400 to-transparent opacity-50"></div>
+           <div className="absolute left-1/2 top-0 h-1 w-3/4 -translate-x-1/2 bg-gradient-to-r from-transparent via-sky-400 to-transparent opacity-60"></div>
            <Outlet />
         </div>
       </main>

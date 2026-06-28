@@ -9,7 +9,7 @@ export const MainLayout: React.FC = () => {
   const isSidebarOpen = useSelector((state: RootState) => state.app.isSidebarOpen);
 
   return (
-    <div className="min-h-screen bg-background flex overflow-hidden transition-all duration-300">
+    <div className="theme-depth-surface flex min-h-screen overflow-hidden bg-background transition-all duration-300 dark:bg-slate-950">
       <Sidebar />
       <div
         className={`flex min-h-screen min-w-0 flex-1 flex-col transition-all duration-300 ${
@@ -17,7 +17,7 @@ export const MainLayout: React.FC = () => {
         }`}
       >
         <Header />
-        <main className="flex h-[calc(100vh-64px)] min-h-0 bg-background transition-all duration-300">
+        <main className="theme-depth-surface flex h-[calc(100vh-64px)] min-h-0 bg-background transition-all duration-300 dark:bg-slate-950">
           <Outlet />
         </main>
       </div>

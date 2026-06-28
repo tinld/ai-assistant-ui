@@ -2,19 +2,24 @@ import React, { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import {
+  BarChart3,
   Bell,
+  Bot,
   ChevronDown,
+  FolderKanban,
   LogOut,
   Moon,
+  Network,
   Search,
   Settings,
-  Sparkles,
   Sun,
   User,
+  UsersRound,
 } from "lucide-react";
 import { toggleTheme } from "../../store/appSlice";
 import type { RootState } from "../../store";
 import { APP_ROUTES } from "../../constants/route.constants";
+import { BrandMark } from "../BrandMark";
 
 export const Header: React.FC = () => {
   const location = useLocation();
@@ -62,6 +67,26 @@ export const Header: React.FC = () => {
     }
   };
 
+  const getPageIcon = () => {
+    switch (location.pathname) {
+      case APP_ROUTES.chat:
+        return { icon: Bot, tone: 'from-sky-500 to-cyan-400 bg-sky-50 text-sky-700 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/40' };
+      case APP_ROUTES.files:
+      case "/knowledge-base":
+        return { icon: FolderKanban, tone: 'from-emerald-500 to-teal-400 bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/40' };
+      case APP_ROUTES.agents:
+        return { icon: UsersRound, tone: 'from-violet-500 to-fuchsia-400 bg-violet-50 text-violet-700 ring-violet-100 dark:bg-violet-950/30 dark:text-violet-300 dark:ring-violet-900/40' };
+      case APP_ROUTES.integrations:
+        return { icon: Network, tone: 'from-amber-500 to-orange-400 bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/40' };
+      case APP_ROUTES.analytics:
+        return { icon: BarChart3, tone: 'from-rose-500 to-pink-400 bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/40' };
+      case APP_ROUTES.settings:
+        return { icon: Settings, tone: 'from-slate-500 to-slate-400 bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-800' };
+      default:
+        return null;
+    }
+  };
+
   const getPageSubtitle = (): string => {
     switch (location.pathname) {
       case APP_ROUTES.chat:
@@ -82,14 +107,22 @@ export const Header: React.FC = () => {
     }
   };
 
+  const pageIcon = getPageIcon();
+  const PageIcon = pageIcon?.icon;
+
   return (
     <header
-      className="sticky top-0 z-40 flex h-16 w-full shrink-0 items-center justify-between border-b border-white/70 bg-white/78 px-6 font-['Inter'] text-sm shadow-[0_10px_35px_rgba(15,23,42,0.06)] backdrop-blur-xl transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-950/78"
+      className="theme-depth-surface sticky top-0 z-40 flex h-16 w-full shrink-0 items-center justify-between border-b border-white/70 bg-white/78 px-6 font-['Inter'] text-sm shadow-[0_10px_35px_rgba(15,23,42,0.06)] backdrop-blur-xl transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-950/78 dark:shadow-black/25"
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-          <Sparkles className="h-5 w-5" aria-hidden="true" />
-        </div>
+        {PageIcon ? (
+          <div className={`relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl ring-1 ${pageIcon.tone}`}>
+            <span className={`absolute inset-0 bg-gradient-to-br ${pageIcon.tone.split(' bg-')[0]} opacity-[0.12]`} aria-hidden="true"></span>
+            <PageIcon className="relative h-5 w-5" aria-hidden="true" />
+          </div>
+        ) : (
+          <BrandMark size="sm" />
+        )}
         <div className="min-w-0">
           <h1 className="truncate text-base font-bold text-slate-950 dark:text-white">{getPageTitle()}</h1>
           <p className="hidden truncate text-xs font-medium text-slate-500 dark:text-slate-400 sm:block">{getPageSubtitle()}</p>
@@ -106,7 +139,7 @@ export const Header: React.FC = () => {
           <Bell className="h-5 w-5" aria-hidden="true" />
         </button>
         <button 
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300"
+          className="theme-sweep-surface inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300"
           onClick={() => dispatch(toggleTheme())}
           title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
           type="button"

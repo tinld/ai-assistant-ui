@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Blocks, Cloud, Database, MessageCircle, PlugZap, Search, ServerCog } from 'lucide-react';
 
 import type { Integration } from '../types/integration.types';
 
@@ -84,6 +85,15 @@ export const Integrations: React.FC = () => {
     return true;
   });
 
+  const filterTabs = [
+    { label: 'All', icon: Blocks, tone: 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-800' },
+    { label: 'Storage', icon: Cloud, tone: 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/40' },
+    { label: 'Communication', icon: MessageCircle, tone: 'bg-purple-50 text-purple-700 ring-purple-100 dark:bg-purple-950/30 dark:text-purple-300 dark:ring-purple-900/40' },
+    { label: 'CRM', icon: ServerCog, tone: 'bg-sky-50 text-sky-700 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/40' },
+    { label: 'Database', icon: Database, tone: 'bg-indigo-50 text-indigo-700 ring-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:ring-indigo-900/40' },
+    { label: 'API', icon: PlugZap, tone: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/40' },
+  ];
+
   return (
     <div className="flex-1 bg-surface-bright dark:bg-slate-900 overflow-y-auto font-['Inter']">
       <div className="max-w-6xl mx-auto px-8 py-8 flex flex-col gap-8">
@@ -103,23 +113,31 @@ export const Integrations: React.FC = () => {
         {/* Search and Filters */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-outline-variant dark:border-slate-800 pb-4">
           <div className="flex flex-wrap gap-2">
-            {['All', 'Storage', 'Communication', 'CRM', 'Database', 'API'].map(tab => (
-              <button 
-                key={tab}
-                onClick={() => setFilter(tab)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  filter === tab 
-                    ? 'bg-violet-600 text-white' 
-                    : 'bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-800 text-on-surface-variant dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+            {filterTabs.map(tab => {
+              const Icon = tab.icon;
+              const isActive = filter === tab.label;
+              return (
+                <button 
+                  key={tab.label}
+                  onClick={() => setFilter(tab.label)}
+                  className={`theme-sweep-surface group inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-bold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                    isActive 
+                      ? 'border-transparent bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.14)] dark:bg-white dark:text-slate-950' 
+                      : 'border-outline-variant bg-white text-on-surface-variant hover:-translate-y-0.5 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900'
+                  }`}
+                  type="button"
+                >
+                  <span className={`grid h-7 w-7 place-items-center rounded-xl ring-1 transition-transform group-hover:scale-105 ${isActive ? 'bg-white/[0.14] text-white ring-white/20 dark:bg-slate-950/10 dark:text-slate-950 dark:ring-slate-950/10' : tab.tone}`}>
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
           
           <div className="relative w-full md:w-72">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
             <input 
               type="text" 
               placeholder="Search integrations..." 

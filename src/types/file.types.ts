@@ -29,6 +29,14 @@ export interface FileItem {
   domain?: string | null;
   tags?: string[];
   metadata?: FileMetadata | null;
+  source?: 'local' | 'google_drive' | string;
+  source_provider?: string | null;
+  source_name?: string | null;
+  source_mime_type?: string | null;
+  source_modified_time?: string | null;
+  source_checksum?: string | null;
+  source_web_url?: string | null;
+  last_source_sync_at?: string | null;
 }
 
 export interface FileUploadResponse {

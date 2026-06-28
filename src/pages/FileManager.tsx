@@ -10,6 +10,7 @@ import { formatBytes } from '../utils/formatters';
 import { getFileExtension, getFileIcon, isSupportedKnowledgeFileType } from '../utils/file.utils';
 import { StatusBadge } from '../components/StatusBadge';
 import { NotificationToast, type NotificationToastData } from '../components/NotificationToast';
+import { GoogleDrivePanel } from '../components/GoogleDrivePanel';
 import {
   FILE_MANAGER_UPLOAD_MAX_SIZE_BYTES,
   FILE_MANAGER_UPLOAD_MAX_SIZE_LABEL,
@@ -560,6 +561,17 @@ export const FileManager: React.FC = () => {
     );
   };
 
+  const renderSourceTag = (doc: FileManagerDocument) => {
+    if (doc.source !== 'google_drive') return null;
+
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" title="Synced from Google Drive">
+        <span className="material-symbols-outlined text-[14px]">add_to_drive</span>
+        Drive
+      </span>
+    );
+  };
+
   return (
     <div className="flex-1 bg-surface-bright dark:bg-slate-900 overflow-y-auto font-['Inter']">
       {openDocumentMenu && (() => {
@@ -877,6 +889,12 @@ export const FileManager: React.FC = () => {
           </div>
         </div>
 
+        <GoogleDrivePanel
+          token={token}
+          onFileSynced={loadFiles}
+          onToast={showToast}
+        />
+
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1036,6 +1054,7 @@ export const FileManager: React.FC = () => {
                         </span>
                       )}
                       {renderSearchVisibilityTag(doc)}
+                      {renderSourceTag(doc)}
                       {renderDocumentControls(doc)}
                     </div>
                   </div>
@@ -1089,6 +1108,7 @@ export const FileManager: React.FC = () => {
                               </span>
                             )}
                             {renderSearchVisibilityTag(doc)}
+                            {renderSourceTag(doc)}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -1128,6 +1148,7 @@ export const FileManager: React.FC = () => {
                         </span>
                       )}
                       {renderSearchVisibilityTag(doc)}
+                      {renderSourceTag(doc)}
                       {renderDocumentControls(doc)}
                     </div>
                   </div>
@@ -1154,6 +1175,7 @@ export const FileManager: React.FC = () => {
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                       .{doc.type}
                     </span>
+                    {renderSourceTag(doc)}
                   </div>
 
                   <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800/50 flex flex-col gap-3">

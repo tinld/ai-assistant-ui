@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { ChevronsLeft, ChevronsRight, CreditCard, Palette, PlugZap, UserRound } from 'lucide-react';
 import { api } from '../services/api';
 import type { RootState } from '../store';
 type Tab = 'Profile' | 'Appearance' | 'Integrations' | 'Billing';
@@ -54,12 +55,35 @@ export const Settings: React.FC = () => {
     }
   };
 
-  // Tab navigation items
-  const tabs: { id: Tab; icon: string; label: string }[] = [
-    { id: 'Profile', icon: 'person', label: 'My Profile' },
-    { id: 'Appearance', icon: 'palette', label: 'Appearance' },
-    { id: 'Integrations', icon: 'extension', label: 'Integrations' },
-    { id: 'Billing', icon: 'credit_card', label: 'Billing' },
+  const tabs = [
+    {
+      id: 'Profile',
+      icon: UserRound,
+      label: 'My Profile',
+      tone: 'bg-sky-50 text-sky-700 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/40',
+      active: 'bg-sky-50 text-sky-800 ring-sky-100 dark:bg-sky-950/35 dark:text-sky-200 dark:ring-sky-900/40',
+    },
+    {
+      id: 'Appearance',
+      icon: Palette,
+      label: 'Appearance',
+      tone: 'bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-100 dark:bg-fuchsia-950/30 dark:text-fuchsia-300 dark:ring-fuchsia-900/40',
+      active: 'bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-100 dark:bg-fuchsia-950/35 dark:text-fuchsia-200 dark:ring-fuchsia-900/40',
+    },
+    {
+      id: 'Integrations',
+      icon: PlugZap,
+      label: 'Integrations',
+      tone: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/40',
+      active: 'bg-amber-50 text-amber-800 ring-amber-100 dark:bg-amber-950/35 dark:text-amber-200 dark:ring-amber-900/40',
+    },
+    {
+      id: 'Billing',
+      icon: CreditCard,
+      label: 'Billing',
+      tone: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/40',
+      active: 'bg-emerald-50 text-emerald-800 ring-emerald-100 dark:bg-emerald-950/35 dark:text-emerald-200 dark:ring-emerald-900/40',
+    },
   ];
 
   return (
@@ -76,32 +100,42 @@ export const Settings: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-8 flex-1 items-start">
           
           {/* Sidebar Tabs */}
-          <div className={`flex-shrink-0 bg-white dark:bg-slate-950 border border-outline-variant dark:border-slate-800 rounded-xl overflow-hidden shadow-sm transition-all duration-300 flex flex-col ${isTabsCollapsed ? 'w-full md:w-16' : 'w-full md:w-64'}`}>
-            <div className={`flex items-center p-2 border-b border-outline-variant dark:border-slate-800/50 ${isTabsCollapsed ? 'justify-center' : 'justify-end'}`}>
+          <div className={`theme-depth-surface flex-shrink-0 overflow-hidden rounded-2xl border border-white/70 bg-white/82 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-950/82 dark:shadow-black/20 flex flex-col ${isTabsCollapsed ? 'w-full md:w-20' : 'w-full md:w-72'}`}>
+            <div className={`flex items-center border-b border-slate-100 p-2 dark:border-slate-800/70 ${isTabsCollapsed ? 'justify-center' : 'justify-between'}`}>
+              {!isTabsCollapsed && <span className="px-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Control Tabs</span>}
               <button 
                 onClick={() => setIsTabsCollapsed(!isTabsCollapsed)}
-                className="p-1 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+                className="grid h-8 w-8 place-items-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 title={isTabsCollapsed ? "Expand Menu" : "Collapse Menu"}
+                type="button"
               >
-                <span className="material-symbols-outlined text-[20px]">{isTabsCollapsed ? 'keyboard_double_arrow_right' : 'keyboard_double_arrow_left'}</span>
+                {isTabsCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
               </button>
             </div>
             <nav className="flex flex-col p-2 gap-1 flex-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  title={isTabsCollapsed ? tab.label : undefined}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
-                      : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50'
-                  } ${isTabsCollapsed ? 'justify-center px-0' : ''}`}
-                >
-                  <span className="material-symbols-outlined text-[20px]">{tab.icon}</span>
-                  {!isTabsCollapsed && <span>{tab.label}</span>}
-                </button>
-              ))}
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as Tab)}
+                    title={isTabsCollapsed ? tab.label : undefined}
+                    className={`theme-sweep-surface group relative flex items-center rounded-2xl px-3 py-2.5 text-sm font-bold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                      isActive
+                        ? `${tab.active} shadow-sm ring-1`
+                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-900'
+                    } ${isTabsCollapsed ? 'justify-center px-2' : 'gap-3'}`}
+                    type="button"
+                  >
+                    {isActive && <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-current" aria-hidden="true"></span>}
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1 transition-transform group-hover:-translate-y-0.5 ${tab.tone}`}>
+                      <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                    </span>
+                    {!isTabsCollapsed && <span>{tab.label}</span>}
+                  </button>
+                );
+              })}
             </nav>
           </div>
 

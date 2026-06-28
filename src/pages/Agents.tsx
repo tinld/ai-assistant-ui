@@ -13,6 +13,7 @@ import {
 import { agentApi } from '../services/agentApi';
 import type { RootState } from '../store';
 import type { AgentFormValues, AgentProfile, ModelOptions, ModelPreset } from '../types/agent.types';
+import { BrandMark } from '../components/BrandMark';
 
 const createEmptyForm = (): AgentFormValues => ({
   ...DEFAULT_AGENT_FORM,
@@ -218,7 +219,7 @@ export const Agents: React.FC = () => {
       <div className="max-w-7xl mx-auto px-8 py-8">
         <div className="flex items-start justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
-            <div className="agent-logo-mark h-12 w-12 rounded-xl shrink-0" aria-hidden="true"></div>
+            <BrandMark size="md" />
             <div>
             <h1 className="text-2xl font-bold text-on-surface dark:text-slate-100">AI Agents</h1>
             <p className="text-sm text-on-surface-variant dark:text-slate-400 mt-1 max-w-2xl">
@@ -254,7 +255,7 @@ export const Agents: React.FC = () => {
               </div>
             ) : agents.length === 0 ? (
               <div className="agent-card-enter rounded-lg border border-dashed border-outline-variant dark:border-slate-800 bg-white dark:bg-slate-950 p-8 text-center">
-                <div className="agent-logo-mark mx-auto h-16 w-16 rounded-2xl" aria-hidden="true"></div>
+                <BrandMark size="lg" className="mx-auto" />
                 <h2 className="mt-3 text-lg font-semibold text-slate-800 dark:text-slate-100">No AI agents yet</h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{AGENT_EMPTY_STATE_TEXT}</p>
                 <button
@@ -297,7 +298,7 @@ export const Agents: React.FC = () => {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 gap-3">
-                        <div className="agent-logo-mark agent-logo-mark-sm h-10 w-10 rounded-lg shrink-0" aria-hidden="true"></div>
+                        <BrandMark size="sm" />
                         <div className="min-w-0">
                           <h2 className="truncate text-base font-bold text-slate-800 dark:text-slate-100">{agent.name}</h2>
                           <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{agent.description}</p>

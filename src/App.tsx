@@ -6,6 +6,7 @@ import { logoutWithNotice } from './store/authSlice';
 import { setUnauthorizedHandler } from './services/api';
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
+import { ThemeAtmosphere } from './components/ThemeAtmosphere';
 import { Chat } from './pages/Chat';
 import { FileManager } from './pages/FileManager';
 import { Integrations } from './pages/Integrations';
@@ -21,14 +22,6 @@ function App() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
-  useEffect(() => {
     setUnauthorizedHandler((message) => {
       dispatch(logoutWithNotice(message));
     });
@@ -38,6 +31,7 @@ function App() {
 
   return (
     <Router>
+      <ThemeAtmosphere theme={theme} />
       <Routes>
         {/* Auth Routes */}
         <Route element={<AuthLayout />}>
