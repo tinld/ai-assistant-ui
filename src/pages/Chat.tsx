@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   AlertTriangle,
@@ -112,6 +112,11 @@ const chatModeOptions = [
   },
 ] as const;
 
+const assistantQuickActions = [
+  { label: 'Summarize', icon: Sparkles, prompt: 'Summarize the previous answer.' },
+  { label: 'Explain', icon: Lightbulb, prompt: 'Explain the previous answer more simply.' },
+] as const;
+
 const formatMessageTime = (timestamp?: string): string => {
   if (!timestamp) return 'Now';
   const date = new Date(timestamp);
@@ -138,7 +143,7 @@ interface AssistantResponseProps {
   assistantLabel: string;
 }
 
-const AssistantResponse: React.FC<AssistantResponseProps> = ({ message, onUsePrompt, assistantLabel }) => {
+const AssistantResponse = memo(function AssistantResponse({ message, onUsePrompt, assistantLabel }: AssistantResponseProps) {
   return (
     <article className="group flex w-full max-w-[44rem] items-start gap-2.5">
       <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 via-indigo-600 to-teal-600 text-white shadow-lg shadow-violet-500/20">
@@ -157,60 +162,64 @@ const AssistantResponse: React.FC<AssistantResponseProps> = ({ message, onUsePro
           <MarkdownMessage content={message.content} />
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-200/70 pt-2.5 dark:border-slate-800">
-            {[
-              { label: 'Summarize', icon: Sparkles, prompt: 'Summarize the previous answer.' },
-              { label: 'Explain', icon: Lightbulb, prompt: 'Explain the previous answer more simply.' },
-            ].map((action) => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={() => onUsePrompt(action.prompt)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition-all hover:border-violet-300 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-700 dark:hover:text-violet-300"
-                >
-                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  {action.label}
-                </button>
-              );
-            })}
+          {assistantQuickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={action.label}
+                type="button"
+                onClick={() => onUsePrompt(action.prompt)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition-all hover:border-violet-300 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-700 dark:hover:text-violet-300"
+              >
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                {action.label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </article>
   );
-};
+}, (previousProps, nextProps) => (
+  previousProps.message === nextProps.message
+  && previousProps.assistantLabel === nextProps.assistantLabel
+));
 
 interface UserMessageProps {
   message: Message;
   fallbackInitial: string;
 }
 
-const UserMessage: React.FC<UserMessageProps> = ({ message, fallbackInitial }) => (
-  <article className="flex w-full justify-end">
-    <div className="flex max-w-[44rem] flex-row-reverse items-start gap-2.5">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold uppercase text-white shadow-lg shadow-slate-900/15 dark:bg-slate-100 dark:text-slate-900">
-        {fallbackInitial}
+const UserMessage = memo(function UserMessage({ message, fallbackInitial }: UserMessageProps) {
+  return (
+    <article className="flex w-full justify-end">
+      <div className="flex max-w-[44rem] flex-row-reverse items-start gap-2.5">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold uppercase text-white shadow-lg shadow-slate-900/15 dark:bg-slate-100 dark:text-slate-900">
+          {fallbackInitial}
+        </div>
+        <div className="rounded-xl rounded-tr-md bg-slate-900 px-3.5 py-2.5 text-[13px] leading-6 text-white shadow-[0_12px_32px_rgba(15,23,42,0.14)] dark:bg-slate-100 dark:text-slate-950">
+          <p className="whitespace-pre-wrap">{message.content}</p>
+          {message.files?.map((file) => (
+            <div key={`${file.name}-${file.size}`} className="mt-2 flex items-center gap-2 rounded-lg bg-white/10 px-2.5 py-2 text-xs dark:bg-slate-900/10">
+              <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate font-semibold">{file.name}</span>
+              <span className="shrink-0 opacity-70">{file.size}</span>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="rounded-xl rounded-tr-md bg-slate-900 px-3.5 py-2.5 text-[13px] leading-6 text-white shadow-[0_12px_32px_rgba(15,23,42,0.14)] dark:bg-slate-100 dark:text-slate-950">
-        <p className="whitespace-pre-wrap">{message.content}</p>
-        {message.files?.map((file) => (
-          <div key={`${file.name}-${file.size}`} className="mt-2 flex items-center gap-2 rounded-lg bg-white/10 px-2.5 py-2 text-xs dark:bg-slate-900/10">
-            <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate font-semibold">{file.name}</span>
-            <span className="shrink-0 opacity-70">{file.size}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  </article>
-);
+    </article>
+  );
+}, (previousProps, nextProps) => (
+  previousProps.message === nextProps.message
+  && previousProps.fallbackInitial === nextProps.fallbackInitial
+));
 
 export const Chat: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const {
     conversations,
     activeConversationId,
-    messages,
     isLoading,
     isHistoryLoading,
     isOlderHistoryLoading,
@@ -257,14 +266,20 @@ export const Chat: React.FC = () => {
     [chatMode]
   );
   const SelectedChatModeIcon = selectedChatMode.icon;
-  const lastUserMessage = useMemo(
-    () => [...messages].reverse().find((message) => message.role === 'user') ?? null,
-    [messages]
-  );
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
     [activeConversationId, conversations]
   );
+  const messages = activeConversation?.messages ?? [];
+  const lastUserMessage = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index]?.role === 'user') {
+        return messages[index];
+      }
+    }
+
+    return null;
+  }, [messages]);
 
   useEffect(() => {
     const cachedConversations = conversations.map((conversation) => ({
@@ -772,9 +787,9 @@ export const Chat: React.FC = () => {
               <>
                 {messages.map((msg, index) => (
                   msg.role === 'assistant' ? (
-                    <AssistantResponse key={msg.id ?? index} message={msg} onUsePrompt={handleUsePrompt} assistantLabel={assistantLabel} />
+                    <AssistantResponse key={msg.id ?? `${msg.role}-${msg.timestamp ?? index}`} message={msg} onUsePrompt={handleUsePrompt} assistantLabel={assistantLabel} />
                   ) : (
-                    <UserMessage key={msg.id ?? index} message={msg} fallbackInitial={userInitial} />
+                    <UserMessage key={msg.id ?? `${msg.role}-${msg.timestamp ?? index}`} message={msg} fallbackInitial={userInitial} />
                   )
                 ))}
 

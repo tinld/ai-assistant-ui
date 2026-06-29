@@ -30,6 +30,20 @@ const getConversationTopic = (messages: Message[], fallback = 'New chat'): strin
   return firstUserMessage.length > 48 ? `${firstUserMessage.slice(0, 48)}...` : firstUserMessage;
 };
 
+const ensureMessageIdentity = (message: Message): Message => {
+  if (message.id && message.timestamp) {
+    return message;
+  }
+
+  return {
+    ...message,
+    id: message.id ?? createId(),
+    timestamp: message.timestamp ?? nowIso(),
+  };
+};
+
+const normalizeMessages = (messages: Message[]): Message[] => messages.map(ensureMessageIdentity);
+
 const createConversation = (values: Partial<ChatConversation> = {}): ChatConversation => {
   const timestamp = nowIso();
 
@@ -41,7 +55,7 @@ const createConversation = (values: Partial<ChatConversation> = {}): ChatConvers
     agentId: values.agentId,
     createdAt: values.createdAt ?? timestamp,
     updatedAt: values.updatedAt ?? timestamp,
-    messages: values.messages ?? [],
+    messages: normalizeMessages(values.messages ?? []),
   };
 };
 
@@ -57,7 +71,7 @@ const readStoredConversations = (): { conversations: ChatConversation[]; activeC
           .filter((conversation) => conversation?.id && Array.isArray(conversation.messages))
           .map((conversation) => ({
             ...conversation,
-            messages: conversation.messages.slice(-CHAT_CACHED_MESSAGE_LIMIT),
+            messages: normalizeMessages(conversation.messages.slice(-CHAT_CACHED_MESSAGE_LIMIT)),
             backendConversationId: conversation.backendConversationId,
             topic: conversation.topic || getConversationTopic(conversation.messages),
             modelLabel: conversation.modelLabel || 'Default agent',
@@ -108,39 +122,28 @@ const ensureActiveConversation = (state: ChatState): ChatConversation => {
   const conversation = createConversation();
   state.conversations.unshift(conversation);
   state.activeConversationId = conversation.id;
-  state.messages = conversation.messages;
   return conversation;
-};
-
-const syncActiveMessages = (state: ChatState): void => {
-  const activeConversation = getActiveConversation(state);
-  state.messages = activeConversation?.messages ?? [];
 };
 
 const appendMessageToActiveConversation = (state: ChatState, message: Message, modelLabel?: string, agentId?: string): void => {
   const activeConversation = ensureActiveConversation(state);
   const timestamp = nowIso();
 
-  activeConversation.messages.push({
+  activeConversation.messages.push(ensureMessageIdentity({
     ...message,
     timestamp: message.timestamp ?? timestamp,
-  });
+  }));
   activeConversation.topic = getConversationTopic(activeConversation.messages, activeConversation.topic);
   activeConversation.modelLabel = modelLabel ?? activeConversation.modelLabel;
   activeConversation.agentId = agentId ?? activeConversation.agentId;
   activeConversation.updatedAt = timestamp;
-  syncActiveMessages(state);
 };
 
 const storedState = readStoredConversations();
-const initialActiveConversation = storedState.conversations.find(
-  (conversation) => conversation.id === storedState.activeConversationId
-);
 
 const initialState: ChatState = {
   conversations: storedState.conversations,
   activeConversationId: storedState.activeConversationId,
-  messages: initialActiveConversation?.messages ?? [],
   isLoading: false,
   isHistoryLoading: false,
   isOlderHistoryLoading: false,
@@ -165,15 +168,21 @@ export const fetchHistory = createAsyncThunk(
 
     try {
       if (conversation && !conversation.backendConversationId) {
-        return {
-          success: true,
-          conversation_id: undefined,
-          history: conversation.messages,
-          hasMore: false,
-          nextCursor: null,
-          loadMode,
-          localConversationId,
-        };
+        const shouldUseLocalOnly = Boolean(input.conversationLocalId)
+          || loadMode === 'older'
+          || conversation.messages.length > 0;
+
+        if (shouldUseLocalOnly) {
+          return {
+            success: true,
+            conversation_id: undefined,
+            history: conversation.messages,
+            hasMore: false,
+            nextCursor: null,
+            loadMode,
+            localConversationId,
+          };
+        }
       }
 
       const query = new URLSearchParams({ limit: String(CHAT_HISTORY_PAGE_SIZE) });
@@ -282,7 +291,6 @@ const chatSlice = createSlice({
         existingEmptyConversation.agentId = action.payload?.agentId ?? existingEmptyConversation.agentId;
         existingEmptyConversation.updatedAt = nowIso();
         state.activeConversationId = existingEmptyConversation.id;
-        state.messages = [];
         state.error = null;
         resetHistoryPagination(state);
         return;
@@ -294,7 +302,6 @@ const chatSlice = createSlice({
       });
       state.conversations.unshift(conversation);
       state.activeConversationId = conversation.id;
-      state.messages = [];
       state.error = null;
       resetHistoryPagination(state);
     },
@@ -304,7 +311,6 @@ const chatSlice = createSlice({
       state.activeConversationId = action.payload;
       state.error = null;
       resetHistoryPagination(state);
-      syncActiveMessages(state);
     },
     renameChatConversation: (state, action: PayloadAction<{ id: string; topic: string }>) => {
       const topic = action.payload.topic.trim();
@@ -329,14 +335,12 @@ const chatSlice = createSlice({
 
       state.error = null;
       resetHistoryPagination(state);
-      syncActiveMessages(state);
     },
     clearActiveConversation: (state) => {
       const activeConversation = ensureActiveConversation(state);
       activeConversation.messages = [];
       activeConversation.topic = 'New chat';
       activeConversation.updatedAt = nowIso();
-      state.messages = [];
       state.error = null;
       resetHistoryPagination(state);
     },
@@ -390,17 +394,16 @@ const chatSlice = createSlice({
           if (action.payload.conversation_id) {
             targetConversation.backendConversationId = action.payload.conversation_id;
           }
+          const historyMessages = normalizeMessages(action.payload.history ?? []);
           targetConversation.messages = loadMode === 'older'
-            ? mergeOlderMessages(targetConversation.messages, action.payload.history ?? [])
-            : action.payload.history ?? [];
+            ? mergeOlderMessages(targetConversation.messages, historyMessages)
+            : historyMessages;
           targetConversation.topic = getConversationTopic(targetConversation.messages, targetConversation.topic);
         }
 
         state.historyConversationId = targetConversation?.id ?? state.activeConversationId;
         state.historyHasMore = Boolean(action.payload.hasMore);
         state.historyCursor = action.payload.nextCursor ?? null;
-
-        syncActiveMessages(state);
       })
       .addCase(fetchHistory.rejected, (state, action) => {
         const loadMode = action.meta.arg?.mode ?? 'initial';
@@ -447,7 +450,6 @@ const chatSlice = createSlice({
         activeConversation.messages = [];
         activeConversation.topic = 'New chat';
         activeConversation.updatedAt = nowIso();
-        state.messages = [];
         resetHistoryPagination(state);
       });
   },
@@ -463,3 +465,4 @@ export const {
 } = chatSlice.actions;
 export { CONVERSATIONS_STORAGE_KEY, ACTIVE_CONVERSATION_STORAGE_KEY };
 export default chatSlice.reducer;
+
