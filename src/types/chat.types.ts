@@ -28,7 +28,6 @@ export interface AttachedFile {
 export interface ChatState {
   conversations: ChatConversation[];
   activeConversationId: string | null;
-  messages: Message[];
   isLoading: boolean;
   isHistoryLoading: boolean;
   isOlderHistoryLoading: boolean;
