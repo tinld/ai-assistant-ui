@@ -1,18 +1,16 @@
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
-  ArrowRight,
   Bot,
   Brain,
-  CheckCircle2,
   Clock3,
   Command,
   Database,
   FileText,
   Check,
   ChevronDown,
-  Layers3,
   Lightbulb,
   LoaderCircle,
   MessageSquarePlus,
@@ -51,6 +49,7 @@ import {
   CHAT_HISTORY_SCROLL_THRESHOLD_PX,
 } from '../constants/chat.constants';
 import { CHAT_ATTACHMENT_ACCEPT, CHAT_ATTACHMENT_MAX_SIZE_LABEL } from '../constants/file.constants';
+import { APP_ROUTES } from '../constants/route.constants';
 import { ChatAttachmentChip } from '../components/ChatAttachmentChip';
 import { MarkdownMessage } from '../components/MarkdownMessage';
 import { useChatAttachment } from '../hooks/useChatAttachment';
@@ -59,29 +58,6 @@ import { agentApi } from '../services/agentApi';
 import type { AgentProfile } from '../types/agent.types';
 import type { Message } from '../types/chat.types';
 import { formatBytes } from '../utils/formatters';
-
-const starterPrompts = [
-  {
-    title: 'Executive summary',
-    prompt: 'Summarize the most important points and recommend the next action.',
-    icon: Sparkles,
-  },
-  {
-    title: 'Compare options',
-    prompt: 'Compare these options side by side with risks, tradeoffs, and a recommendation.',
-    icon: Layers3,
-  },
-  {
-    title: 'Find evidence',
-    prompt: 'Research this topic and separate facts, assumptions, and open questions.',
-    icon: Search,
-  },
-  {
-    title: 'Build workflow',
-    prompt: 'Turn this into a step-by-step execution plan with owners and checkpoints.',
-    icon: CheckCircle2,
-  },
-];
 
 const commandSuggestions = [
   { cmd: '/facts', icon: Brain, desc: 'Add durable knowledge for the assistant.' },
@@ -95,20 +71,20 @@ const chatModeOptions = [
   {
     value: 'auto',
     label: 'Auto',
-    description: 'Classify',
+    description: 'Best mode',
     icon: Wand2,
   },
   {
-    value: 'general',
-    label: 'Web',
-    description: 'Search',
-    icon: Search,
+    value: 'private',
+    label: 'Sources only',
+    description: 'Sources only',
+    icon: Database,
   },
   {
-    value: 'private',
-    label: 'Private',
-    description: 'KB',
-    icon: Database,
+    value: 'general',
+    label: 'General',
+    description: 'Files + general knowledge',
+    icon: Search,
   },
 ] as const;
 
@@ -217,6 +193,7 @@ const UserMessage = memo(function UserMessage({ message, fallbackInitial }: User
 
 export const Chat: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const {
     conversations,
     activeConversationId,
@@ -518,6 +495,12 @@ export const Chat: React.FC = () => {
   );
   const userInitial = user?.full_name?.[0] || user?.email?.[0] || 'U';
   const assistantLabel = activeConversation?.modelLabel ?? selectedAgent?.name ?? 'Default agent';
+  const isEmptyChat = messages.length === 0 && !isLoading && !isHistoryLoading;
+  const sourceInlineLabel = attachment?.status === 'ready'
+    ? `Using ${attachment.name} · Indexed`
+    : attachment
+      ? `Indexing ${attachment.name}...`
+      : 'No source selected';
   return (
     <div className="flex h-full min-h-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.10),transparent_28%),linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.16),transparent_30%),linear-gradient(180deg,#020617_0%,#0f172a_100%)]">
       <aside className={`hidden min-h-0 shrink-0 flex-col border-r border-white/70 bg-white/72 backdrop-blur-xl transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-950/72 lg:flex ${isRecentConversationsOpen ? 'w-64' : 'w-14'}`}>
@@ -739,48 +722,97 @@ export const Chat: React.FC = () => {
               </div>
             )}
 
-            {messages.length === 0 && !isLoading && !isHistoryLoading ? (
-              <div className="grid min-h-full content-center gap-6 py-6">
-                <div className="max-w-3xl">
-                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white/78 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-violet-700 shadow-sm backdrop-blur dark:border-violet-900/60 dark:bg-slate-950/78 dark:text-violet-300">
-                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                    Ready
-                  </div>
+            {isEmptyChat ? (
+              <div className="grid min-h-full content-center justify-items-center gap-6 px-2 py-10 text-center">
+                <div>
                   <h1 className="text-2xl font-bold leading-tight text-slate-950 dark:text-white sm:text-3xl">
-                    Good to see you, {user?.full_name || 'there'}.
+                    What are we working on?
                   </h1>
-                  <p className="mt-2.5 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    Ask anything. I will keep the answer clear and useful.
+                  <p className="mt-2.5 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    Ask anything, or attach files to chat with your documents.
                   </p>
-                  {selectedAgent && (
-                    <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white/82 px-3 py-1.5 text-sm font-bold text-slate-700 dark:border-slate-800 dark:bg-slate-950/82 dark:text-slate-200">
-                      <Bot className="h-3.5 w-3.5 text-violet-600 dark:text-violet-300" aria-hidden="true" />
-                      Working with {selectedAgent.name}
-                    </div>
-                  )}
                 </div>
 
-                <div className="grid gap-2.5 sm:grid-cols-2">
-                  {starterPrompts.map((item) => {
-                    const Icon = item.icon;
-                    return (
+                <div className="w-full max-w-3xl rounded-2xl border border-white/80 bg-white/92 p-2.5 text-left shadow-[0_22px_70px_rgba(15,23,42,0.11)] backdrop-blur-xl transition-all focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-500/35 dark:border-slate-800 dark:bg-slate-950/90">
+                  {attachment && (
+                    <ChatAttachmentChip attachment={attachment} onRemove={clearAttachment} />
+                  )}
+
+                  <div className="flex items-start gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept={CHAT_ATTACHMENT_ACCEPT}
+                      onChange={(event) => void handleFileSelection(event)}
+                      className="hidden"
+                    />
+                    <textarea
+                      ref={inputRef}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      className="min-h-24 flex-1 resize-none overflow-y-auto border-none bg-transparent px-2 py-2 text-base leading-6 text-slate-900 placeholder:text-slate-400 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      placeholder="Message Buddy..."
+                      rows={3}
+                    />
+                    <button
+                      onClick={handleSend}
+                      disabled={!inputValue.trim() || isLoading || isAttachmentBusy}
+                      className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-lg shadow-violet-600/25 transition-all hover:-translate-y-0.5 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 dark:focus:ring-offset-slate-950"
+                      type="button"
+                      title="Send message"
+                    >
+                      <Send className="h-4.5 w-4.5" aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 px-1 pt-2 dark:border-slate-800">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                       <button
-                        key={item.title}
+                        onClick={openFilePicker}
+                        disabled={Boolean(attachment)}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300"
+                        title={attachment ? 'Remove the current attachment first' : `Attach and sync a file (${CHAT_ATTACHMENT_MAX_SIZE_LABEL} max)`}
                         type="button"
-                        onClick={() => handleUsePrompt(item.prompt)}
-                        className="group rounded-xl border border-white/80 bg-white/82 p-3.5 text-left shadow-[0_18px_45px_rgba(15,23,42,0.07)] backdrop-blur transition-all hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_24px_60px_rgba(88,28,135,0.14)] focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-slate-800 dark:bg-slate-950/82 dark:hover:border-violet-700"
                       >
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition-colors group-hover:bg-violet-100 group-hover:text-violet-700 dark:bg-slate-900 dark:text-slate-300 dark:group-hover:bg-violet-900/30 dark:group-hover:text-violet-300">
-                            <Icon className="h-4 w-4" aria-hidden="true" />
-                          </span>
-                          <ArrowRight className="h-3.5 w-3.5 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-violet-600 dark:group-hover:text-violet-300" aria-hidden="true" />
-                        </div>
-                        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">{item.title}</h2>
-                        <p className="mt-1 text-[13px] leading-5 text-slate-500 dark:text-slate-400">{item.prompt}</p>
+                        <Paperclip className="h-4 w-4" aria-hidden="true" />
+                        Attach
                       </button>
-                    );
-                  })}
+                      <button
+                        onClick={() => navigate(APP_ROUTES.files)}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-violet-300"
+                        type="button"
+                      >
+                        <Database className="h-4 w-4" aria-hidden="true" />
+                        Sources
+                      </button>
+                      <span className="min-w-0 truncate px-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {sourceInlineLabel}
+                      </span>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/70" role="group" aria-label="Answer mode">
+                      {chatModeOptions.map((mode) => {
+                        const isActive = chatMode === mode.value;
+
+                        return (
+                          <button
+                            key={mode.value}
+                            type="button"
+                            onClick={() => setChatMode(mode.value)}
+                            className={`inline-flex h-7 min-w-[5rem] items-center justify-center rounded-md px-2 text-[11px] font-bold transition-all focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                              isActive
+                                ? 'bg-violet-600 text-white shadow-sm shadow-violet-600/20 dark:bg-violet-500'
+                                : 'text-slate-500 hover:bg-white/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-950/70 dark:hover:text-slate-100'
+                            }`}
+                            title={mode.description}
+                          >
+                            {mode.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -813,6 +845,7 @@ export const Chat: React.FC = () => {
           </div>
         </div>
 
+        {!isEmptyChat && (
         <div className="shrink-0 border-t border-white/70 bg-[#eef4ff]/92 px-4 py-3 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-900/92 sm:px-5 lg:px-6">
           <div className="mx-auto max-w-6xl">
             {inputValue.startsWith('/') && visibleCommands.length > 0 && (
@@ -949,7 +982,7 @@ export const Chat: React.FC = () => {
                           key={mode.value}
                           type="button"
                           onClick={() => setChatMode(mode.value)}
-                          className={`inline-flex h-7 min-w-[4.5rem] items-center justify-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold transition-all focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                          className={`inline-flex h-7 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold transition-all focus:outline-none focus:ring-2 focus:ring-violet-500 ${
                             isActive
                               ? 'bg-violet-600 text-white shadow-sm shadow-violet-600/20 dark:bg-violet-500 dark:text-white dark:shadow-violet-950/30'
                               : 'text-slate-500 hover:bg-white/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-950/70 dark:hover:text-slate-100'
@@ -1030,6 +1063,7 @@ export const Chat: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
       </section>
     </div>
   );
