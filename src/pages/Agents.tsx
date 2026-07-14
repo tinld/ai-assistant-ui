@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
@@ -14,6 +14,7 @@ import { agentApi } from '../services/agentApi';
 import type { RootState } from '../store';
 import type { AgentFormValues, AgentProfile, ModelOptions, ModelPreset } from '../types/agent.types';
 import { BrandMark } from '../components/BrandMark';
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer';
 
 const createEmptyForm = (): AgentFormValues => ({
   ...DEFAULT_AGENT_FORM,
@@ -54,6 +55,7 @@ export const Agents: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [setupStep, setSetupStep] = useState(0);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
+  const setupDialogRef = useRef<HTMLElement>(null);
 
   const selectedAgent = useMemo(
     () => agents.find((agent) => agent.agent_id === selectedAgentId) ?? null,
@@ -96,6 +98,19 @@ export const Agents: React.FC = () => {
 
     return () => window.clearTimeout(timeoutId);
   }, [loadAgents]);
+
+  const handleCloseSetup = (): void => {
+    setIsSetupOpen(false);
+    setSelectedAgentId(null);
+    setSetupStep(0);
+    setError(null);
+  };
+
+  useDismissibleLayer({
+    enabled: isSetupOpen,
+    ref: setupDialogRef,
+    onDismiss: handleCloseSetup,
+  });
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -169,7 +184,7 @@ export const Agents: React.FC = () => {
         : await agentApi.updateAgent(selectedAgent.agent_id, payload, token);
 
       await loadAgents();
-      setSelectedAgentId(savedAgent.agent_id);
+      setSelectedAgentId(null);
       setFormValues(formFromAgent(savedAgent));
       setIsCreating(false);
       setSetupStep(0);
@@ -206,12 +221,6 @@ export const Agents: React.FC = () => {
     if (setupStep > 0) {
       setSetupStep((current) => current - 1);
     }
-  };
-
-  const handleCloseSetup = (): void => {
-    setIsSetupOpen(false);
-    setSetupStep(0);
-    setError(null);
   };
 
   return (
@@ -331,7 +340,7 @@ export const Agents: React.FC = () => {
 
       {isSetupOpen && (
         <div className="agent-backdrop-enter fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-sm">
-          <aside className="agent-modal-enter max-h-[calc(100vh-3rem)] w-full max-w-2xl overflow-y-auto rounded-lg border border-outline-variant bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-950">
+          <aside ref={setupDialogRef} className="agent-modal-enter max-h-[calc(100vh-3rem)] w-full max-w-2xl overflow-y-auto rounded-lg border border-outline-variant bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-950">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">

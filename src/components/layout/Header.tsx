@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import {
@@ -20,6 +20,7 @@ import { toggleTheme } from "../../store/appSlice";
 import type { RootState } from "../../store";
 import { APP_ROUTES } from "../../constants/route.constants";
 import { BrandMark } from "../BrandMark";
+import { useDismissibleLayer } from "../../hooks/useDismissibleLayer";
 
 export const Header: React.FC = () => {
   const location = useLocation();
@@ -30,21 +31,11 @@ export const Header: React.FC = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        userMenuRef.current &&
-        !userMenuRef.current.contains(event.target as Node)
-      ) {
-        setIsUserMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+  useDismissibleLayer({
+    enabled: isUserMenuOpen,
+    ref: userMenuRef,
+    onDismiss: () => setIsUserMenuOpen(false),
+  });
 
   const getPageTitle = (): string => {
     switch (location.pathname) {

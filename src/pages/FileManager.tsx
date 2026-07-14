@@ -11,6 +11,7 @@ import { getFileExtension, getFileIcon, isSupportedKnowledgeFileType } from '../
 import { StatusBadge } from '../components/StatusBadge';
 import { NotificationToast, type NotificationToastData } from '../components/NotificationToast';
 import { GoogleDrivePanel } from '../components/GoogleDrivePanel';
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer';
 import {
   FILE_MANAGER_UPLOAD_MAX_SIZE_BYTES,
   FILE_MANAGER_UPLOAD_MAX_SIZE_LABEL,
@@ -116,6 +117,8 @@ export const FileManager: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const displayMenuRef = useRef<HTMLDivElement>(null);
   const documentMenuRef = useRef<HTMLDivElement>(null);
+  const renameDialogRef = useRef<HTMLDivElement>(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
   const toastIdRef = useRef(0);
   const togglingDocumentIdsRef = useRef<Set<string>>(new Set());
   const renamingKeysRef = useRef<Set<string>>(new Set());
@@ -130,31 +133,29 @@ export const FileManager: React.FC = () => {
     }
   }, [token]);
 
-  useEffect(() => {
-    if (!isDisplayMenuOpen) return;
+  useDismissibleLayer({
+    enabled: isDisplayMenuOpen,
+    ref: displayMenuRef,
+    onDismiss: () => setIsDisplayMenuOpen(false),
+  });
 
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!displayMenuRef.current?.contains(event.target as Node)) {
-        setIsDisplayMenuOpen(false);
-      }
-    };
+  useDismissibleLayer({
+    enabled: Boolean(openDocumentMenu),
+    ref: documentMenuRef,
+    onDismiss: () => setOpenDocumentMenu(null),
+  });
 
-    window.addEventListener('mousedown', handlePointerDown);
-    return () => window.removeEventListener('mousedown', handlePointerDown);
-  }, [isDisplayMenuOpen]);
+  useDismissibleLayer({
+    enabled: Boolean(renameDialog),
+    ref: renameDialogRef,
+    onDismiss: () => setRenameDialog(null),
+  });
 
-  useEffect(() => {
-    if (!openDocumentMenu) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!documentMenuRef.current?.contains(event.target as Node)) {
-        setOpenDocumentMenu(null);
-      }
-    };
-
-    window.addEventListener('mousedown', handlePointerDown);
-    return () => window.removeEventListener('mousedown', handlePointerDown);
-  }, [openDocumentMenu]);
+  useDismissibleLayer({
+    enabled: Boolean(deleteDialog),
+    ref: deleteDialogRef,
+    onDismiss: () => setDeleteDialog(null),
+  });
 
   useEffect(() => {
     if (!toast) return;
@@ -677,8 +678,8 @@ export const FileManager: React.FC = () => {
       })()}
       <NotificationToast key={toast?.id} notification={toast} />
       {renameDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-outline-variant bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+        <div className="modal-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
+          <div ref={renameDialogRef} className="modal-panel-enter w-full max-w-md overflow-hidden rounded-2xl border border-outline-variant bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
               <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Rename file</h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose a clearer name for this file in storage and synced views.</p>
@@ -726,8 +727,8 @@ export const FileManager: React.FC = () => {
         const classification = getDocumentClassification(doc);
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
-            <div className="w-full max-w-md overflow-hidden rounded-2xl border border-red-100 bg-white shadow-2xl dark:border-red-900/40 dark:bg-slate-950">
+          <div className="modal-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
+            <div ref={deleteDialogRef} className="modal-panel-enter w-full max-w-md overflow-hidden rounded-2xl border border-red-100 bg-white shadow-2xl dark:border-red-900/40 dark:bg-slate-950">
               <div className="px-5 pt-5">
                 <div className="flex items-start gap-4">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300">

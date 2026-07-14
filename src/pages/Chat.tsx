@@ -6,10 +6,10 @@ import {
   Bot,
   Brain,
   Clock3,
+  Check,
   Command,
   Database,
   FileText,
-  Check,
   ChevronDown,
   Lightbulb,
   LoaderCircle,
@@ -27,7 +27,6 @@ import {
   Trash2,
   Wand2,
   RotateCcw,
-  X,
 } from 'lucide-react';
 import type { RootState, AppDispatch } from '../store';
 import {
@@ -53,10 +52,11 @@ import { APP_ROUTES } from '../constants/route.constants';
 import { ChatAttachmentChip } from '../components/ChatAttachmentChip';
 import { MarkdownMessage } from '../components/MarkdownMessage';
 import { useChatAttachment } from '../hooks/useChatAttachment';
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer';
 import { api } from '../services/api';
 import { agentApi } from '../services/agentApi';
 import type { AgentProfile } from '../types/agent.types';
-import type { Message } from '../types/chat.types';
+import type { ChatConversation, Message } from '../types/chat.types';
 import { formatBytes } from '../utils/formatters';
 
 const commandSuggestions = [
@@ -222,13 +222,16 @@ export const Chat: React.FC = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [isLoggingEnabled, setIsLoggingEnabled] = useState(false);
   const [openConversationMenuId, setOpenConversationMenuId] = useState<string | null>(null);
-  const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
-  const [editingTopic, setEditingTopic] = useState('');
+  const [renameDialog, setRenameDialog] = useState<{ conversation: ChatConversation; value: string } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<ChatConversation | null>(null);
   const [isAgentPickerOpen, setIsAgentPickerOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const agentPickerRef = useRef<HTMLDivElement>(null);
+  const conversationMenuRef = useRef<HTMLDivElement>(null);
+  const renameDialogRef = useRef<HTMLDivElement>(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const isPrependingHistoryRef = useRef(false);
   const historyRequestPendingRef = useRef(false);
@@ -311,29 +314,29 @@ export const Chat: React.FC = () => {
     }
   }, [isLoading]);
 
-  useEffect(() => {
-    if (!isAgentPickerOpen) return;
+  useDismissibleLayer({
+    enabled: Boolean(openConversationMenuId),
+    ref: conversationMenuRef,
+    onDismiss: () => setOpenConversationMenuId(null),
+  });
 
-    const handlePointerDown = (event: MouseEvent): void => {
-      if (!agentPickerRef.current?.contains(event.target as Node)) {
-        setIsAgentPickerOpen(false);
-      }
-    };
+  useDismissibleLayer({
+    enabled: isAgentPickerOpen,
+    ref: agentPickerRef,
+    onDismiss: () => setIsAgentPickerOpen(false),
+  });
 
-    const handleEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        setIsAgentPickerOpen(false);
-      }
-    };
+  useDismissibleLayer({
+    enabled: Boolean(renameDialog),
+    ref: renameDialogRef,
+    onDismiss: () => setRenameDialog(null),
+  });
 
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isAgentPickerOpen]);
+  useDismissibleLayer({
+    enabled: Boolean(deleteDialog),
+    ref: deleteDialogRef,
+    onDismiss: () => setDeleteDialog(null),
+  });
 
   useEffect(() => {
     if (isPrependingHistoryRef.current) return;
@@ -462,32 +465,42 @@ export const Chat: React.FC = () => {
     dispatch(selectChatConversation(conversationId));
     dispatch(fetchHistory({ mode: 'initial', conversationLocalId: conversationId }));
     setOpenConversationMenuId(null);
-    setEditingConversationId(null);
+    setRenameDialog(null);
+    setDeleteDialog(null);
   };
 
-  const handleStartRename = (conversationId: string, topic: string): void => {
-    setEditingConversationId(conversationId);
-    setEditingTopic(topic);
+  const handleStartRename = (conversation: ChatConversation): void => {
+    setRenameDialog({
+      conversation,
+      value: conversation.topic,
+    });
     setOpenConversationMenuId(null);
   };
 
   const handleSaveRename = (): void => {
-    if (!editingConversationId) return;
+    if (!renameDialog) return;
+
+    const topic = renameDialog.value.trim();
+    if (!topic) return;
 
     dispatch(renameChatConversation({
-      id: editingConversationId,
-      topic: editingTopic,
+      id: renameDialog.conversation.id,
+      topic,
     }));
-    setEditingConversationId(null);
-    setEditingTopic('');
+    setRenameDialog(null);
   };
 
-  const handleDeleteConversation = (conversationId: string): void => {
-    if (!window.confirm('Delete this conversation?')) return;
-
-    dispatch(deleteChatConversation(conversationId));
+  const handleRequestDeleteConversation = (conversation: ChatConversation): void => {
+    setDeleteDialog(conversation);
     setOpenConversationMenuId(null);
-    setEditingConversationId(null);
+  };
+
+  const handleConfirmDeleteConversation = (): void => {
+    if (!deleteDialog) return;
+
+    dispatch(deleteChatConversation(deleteDialog.id));
+    setDeleteDialog(null);
+    setRenameDialog(null);
   };
 
   const visibleCommands = commandSuggestions.filter((command) =>
@@ -536,10 +549,10 @@ export const Chat: React.FC = () => {
               <div className="space-y-2">
                 {conversations.map((conversation) => {
                   const isActive = conversation.id === activeConversationId;
-                  const isEditing = conversation.id === editingConversationId;
 
                   return (
                     <div
+                      ref={openConversationMenuId === conversation.id ? conversationMenuRef : undefined}
                       key={conversation.id}
                       className={`group relative rounded-xl border p-2.5 transition-colors ${
                         isActive
@@ -547,39 +560,7 @@ export const Chat: React.FC = () => {
                           : 'border-slate-200 bg-white/70 hover:border-violet-200 hover:bg-white dark:border-slate-800 dark:bg-slate-950/70 dark:hover:border-violet-900'
                       }`}
                     >
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <input
-                            value={editingTopic}
-                            onChange={(event) => setEditingTopic(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') handleSaveRename();
-                              if (event.key === 'Escape') setEditingConversationId(null);
-                            }}
-                            className="w-full rounded-lg border border-violet-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 dark:border-violet-900 dark:bg-slate-900 dark:text-slate-100"
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={handleSaveRename}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-2 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
-                            >
-                              <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingConversationId(null)}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-                            >
-                              <X className="h-3.5 w-3.5" aria-hidden="true" />
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
+                      <>
                           <button
                             type="button"
                             onClick={() => handleSelectConversation(conversation.id)}
@@ -609,7 +590,7 @@ export const Chat: React.FC = () => {
                             <div className="absolute right-2 top-10 z-20 w-32 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
                               <button
                                 type="button"
-                                onClick={() => handleStartRename(conversation.id, conversation.topic)}
+                                onClick={() => handleStartRename(conversation)}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900"
                               >
                                 <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
@@ -617,7 +598,7 @@ export const Chat: React.FC = () => {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleDeleteConversation(conversation.id)}
+                                onClick={() => handleRequestDeleteConversation(conversation)}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/30"
                               >
                                 <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -626,7 +607,6 @@ export const Chat: React.FC = () => {
                             </div>
                           )}
                         </>
-                      )}
                     </div>
                   );
                 })}
@@ -662,6 +642,7 @@ export const Chat: React.FC = () => {
             </div>
           )}
         </div>
+
       </aside>
 
       <section className="mx-auto flex min-h-0 w-full max-w-[88rem] flex-1 flex-col">
@@ -1065,6 +1046,101 @@ export const Chat: React.FC = () => {
         </div>
         )}
       </section>
+
+      {renameDialog && (
+        <div className="modal-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
+          <div ref={renameDialogRef} className="modal-panel-enter w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Rename chat</h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose a clearer title for this conversation in your sidebar.</p>
+            </div>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleSaveRename();
+              }}
+              className="p-5"
+            >
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Chat title</span>
+                <input
+                  autoFocus
+                  value={renameDialog.value}
+                  onChange={(event) => setRenameDialog((current) => current ? { ...current, value: event.target.value } : current)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition-colors focus:border-violet-500 focus:ring-2 focus:ring-violet-500/15 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              </label>
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRenameDialog(null)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={renameDialog.value.trim().length === 0}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                >
+                  Save title
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {deleteDialog && (
+        <div className="modal-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
+          <div ref={deleteDialogRef} className="modal-panel-enter w-full max-w-md overflow-hidden rounded-2xl border border-red-100 bg-white shadow-2xl dark:border-red-900/40 dark:bg-slate-950">
+            <div className="px-5 pt-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300">
+                  <Trash2 className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-semibold text-slate-950 dark:text-slate-100">Delete chat?</h3>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    This removes the conversation from your sidebar and clears its local message history.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100" title={deleteDialog.topic}>
+                  {deleteDialog.topic}
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <span>{deleteDialog.modelLabel}</span>
+                  <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+                  <span>{deleteDialog.messages.length} messages</span>
+                  <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+                  <span>Updated {formatConversationTime(deleteDialog.updatedAt)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-3 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setDeleteDialog(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteConversation}
+                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                Delete chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
