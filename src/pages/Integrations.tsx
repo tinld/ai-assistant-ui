@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { Blocks, Cloud, Database, MessageCircle, PlugZap, Search, ServerCog } from 'lucide-react';
 
 import type { Integration } from '../types/integration.types';
+import type { RootState } from '../store';
+import { gmailApi } from '../services/gmailApi';
+import { googleDriveApi } from '../services/googleDriveApi';
 
 const INITIAL_MOCK_DATA: Integration[] = [
   {
@@ -12,7 +16,7 @@ const INITIAL_MOCK_DATA: Integration[] = [
     icon: 'add_to_drive',
     iconBgClass: 'bg-blue-100 dark:bg-blue-900/30',
     iconTextClass: 'text-blue-600 dark:text-blue-400',
-    isConnected: true,
+    isConnected: false,
   },
   {
     id: '2',
@@ -64,19 +68,93 @@ const INITIAL_MOCK_DATA: Integration[] = [
     iconTextClass: 'text-slate-600 dark:text-slate-400',
     isConnected: true,
   },
+  {
+    id: '7',
+    name: 'Gmail',
+    description: 'Let chat search and read relevant email for one prompt at a time.',
+    category: 'Communication',
+    icon: 'mail',
+    iconBgClass: 'bg-red-100 dark:bg-red-900/30',
+    iconTextClass: 'text-red-600 dark:text-red-400',
+    isConnected: false,
+  },
 ];
 
 export const Integrations: React.FC = () => {
+  const token = useSelector((state: RootState) => state.auth.token);
   const [integrations, setIntegrations] = useState<Integration[]>(INITIAL_MOCK_DATA);
   const [filter, setFilter] = useState<string>('All');
   const [search, setSearch] = useState<string>('');
 
-  const toggleIntegration = (id: string) => {
-    setIntegrations(prev => 
-      prev.map(int => 
-        int.id === id ? { ...int, isConnected: !int.isConnected } : int
-      )
-    );
+  const [connectionError, setConnectionError] = useState<string | null>(() => {
+    const gmailResult = new URLSearchParams(window.location.search).get('gmail');
+    return gmailResult === 'error' ? 'Gmail connection failed. Please try again.' : null;
+  });
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    void Promise.allSettled([
+      googleDriveApi.getStatus(token),
+      gmailApi.getStatus(token),
+    ]).then(([driveResult, gmailResult]) => {
+      if (cancelled) return;
+      setIntegrations((current) => current.map((integration) => {
+        if (integration.id === '1' && driveResult.status === 'fulfilled') {
+          return { ...integration, isConnected: driveResult.value.connected };
+        }
+        if (integration.id === '7' && gmailResult.status === 'fulfilled') {
+          return { ...integration, isConnected: gmailResult.value.connected };
+        }
+        return integration;
+      }));
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    const gmailResult = params.get('gmail');
+    if (gmailResult) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const toggleIntegration = async (id: string): Promise<void> => {
+    const integration = integrations.find((item) => item.id === id);
+    if (!integration || !token) return;
+    setConnectionError(null);
+
+    try {
+      if (id === '1') {
+        if (integration.isConnected) {
+          await googleDriveApi.disconnect(token);
+          setIntegrations((current) => current.map((item) => item.id === id ? { ...item, isConnected: false } : item));
+        } else {
+          const response = await googleDriveApi.connect(token);
+          window.location.assign(response.authorization_url);
+        }
+        return;
+      }
+      if (id === '7') {
+        if (integration.isConnected) {
+          await gmailApi.disconnect(token);
+          setIntegrations((current) => current.map((item) => item.id === id ? { ...item, isConnected: false } : item));
+        } else {
+          const response = await gmailApi.connect(token);
+          window.location.assign(response.authorization_url);
+        }
+        return;
+      }
+
+      setIntegrations(prev =>
+        prev.map(int =>
+          int.id === id ? { ...int, isConnected: !int.isConnected } : int
+        )
+      );
+    } catch (error) {
+      setConnectionError(error instanceof Error ? error.message : 'Unable to update this integration.');
+    }
   };
 
   const filteredIntegrations = integrations.filter(int => {
@@ -109,6 +187,12 @@ export const Integrations: React.FC = () => {
             Add Custom API
           </button>
         </div>
+
+        {connectionError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+            {connectionError}
+          </div>
+        )}
 
         {/* Search and Filters */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-outline-variant dark:border-slate-800 pb-4">
@@ -166,7 +250,7 @@ export const Integrations: React.FC = () => {
                     type="checkbox" 
                     className="sr-only peer" 
                     checked={integration.isConnected} 
-                    onChange={() => toggleIntegration(integration.id)} 
+                    onChange={() => void toggleIntegration(integration.id)}
                   />
                   <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-violet-600"></div>
                 </label>

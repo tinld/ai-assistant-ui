@@ -50,13 +50,17 @@ import {
 import { CHAT_ATTACHMENT_ACCEPT, CHAT_ATTACHMENT_MAX_SIZE_LABEL } from '../constants/file.constants';
 import { APP_ROUTES } from '../constants/route.constants';
 import { ChatAttachmentChip } from '../components/ChatAttachmentChip';
+import { ChatSourceChips } from '../components/chat/ChatSourceChips';
+import { IntegratedMentionMenu } from '../components/chat/IntegratedMentionMenu';
 import { MarkdownMessage } from '../components/MarkdownMessage';
 import { useChatAttachment } from '../hooks/useChatAttachment';
+import { useAvailableChatSources } from '../hooks/useAvailableChatSources';
 import { useDismissibleLayer } from '../hooks/useDismissibleLayer';
 import { api } from '../services/api';
 import { agentApi } from '../services/agentApi';
 import type { AgentProfile } from '../types/agent.types';
 import type { ChatConversation, Message } from '../types/chat.types';
+import type { ChatSourceSelection } from '../types/chat-source.types';
 import { formatBytes } from '../utils/formatters';
 
 const commandSuggestions = [
@@ -137,6 +141,23 @@ const AssistantResponse = memo(function AssistantResponse({ message, onUsePrompt
         <div className="prose prose-sm max-w-none text-[13px] text-slate-700 dark:prose-invert dark:text-slate-200">
           <MarkdownMessage content={message.content} />
         </div>
+        {message.references && message.references.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Answer sources">
+            {message.references.map((reference, index) => {
+              const key = typeof reference === 'string' ? reference : `${reference.document_id ?? reference.message_id}-${reference.chunk_id}-${index}`;
+              const label = typeof reference === 'string' ? reference : reference.label;
+              return typeof reference !== 'string' && reference.web_url ? (
+                <a key={key} href={reference.web_url} target="_blank" rel="noreferrer" className="max-w-56 truncate rounded-md bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600 hover:underline dark:bg-red-950/30 dark:text-red-300">
+                  {label}
+                </a>
+              ) : (
+                <span key={key} className="max-w-56 truncate rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-200/70 pt-2.5 dark:border-slate-800">
           {assistantQuickActions.map((action) => {
             const Icon = action.icon;
@@ -182,6 +203,7 @@ const UserMessage = memo(function UserMessage({ message, fallbackInitial }: User
               <span className="shrink-0 opacity-70">{file.size}</span>
             </div>
           ))}
+          {message.sources && <ChatSourceChips sources={message.sources} compact />}
         </div>
       </div>
     </article>
@@ -207,6 +229,7 @@ export const Chat: React.FC = () => {
   const isRecentConversationsOpen = useSelector((state: RootState) => state.app.isRecentConversationsOpen);
   const user = useSelector((state: RootState) => state.auth.user);
   const token = useSelector((state: RootState) => state.auth.token);
+  const { capabilities: sourceCapabilities, refresh: refreshSourceCapabilities } = useAvailableChatSources(token);
   const {
     attachment,
     fileInputRef,
@@ -217,6 +240,8 @@ export const Chat: React.FC = () => {
   } = useChatAttachment(token);
 
   const [inputValue, setInputValue] = useState('');
+  const [selectedSources, setSelectedSources] = useState<ChatSourceSelection[]>([]);
+  const [sourceError, setSourceError] = useState<string | null>(null);
   const [chatMode, setChatMode] = useState('auto');
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
@@ -250,7 +275,7 @@ export const Chat: React.FC = () => {
     () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
     [activeConversationId, conversations]
   );
-  const messages = activeConversation?.messages ?? [];
+  const messages = useMemo(() => activeConversation?.messages ?? [], [activeConversation]);
   const lastUserMessage = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       if (messages[index]?.role === 'user') {
@@ -389,11 +414,43 @@ export const Chat: React.FC = () => {
     }
   };
 
+  const handleConsumeMention = (): void => {
+    setInputValue((current) => current.replace(/@([a-z]*)$/i, '').trimEnd());
+  };
+
+  const handleSelectSource = (source: ChatSourceSelection): void => {
+    setSelectedSources((current) => {
+      const isDuplicate = current.some((item) => (
+        item.provider === source.provider
+        && item.resource_type === source.resource_type
+        && item.resource_id === source.resource_id
+      ));
+      return isDuplicate ? current : [...current, source];
+    });
+    setSourceError(null);
+    void refreshSourceCapabilities();
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const handleRemoveSource = (clientId: string): void => {
+    setSelectedSources((current) => current.filter((source) => source.client_id !== clientId));
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim()) return;
 
     const messageContent = inputValue.trim();
     const readyAttachment = attachment?.status === 'ready' ? attachment : null;
+    const attachmentSource: ChatSourceSelection | null = readyAttachment?.documentId ? {
+      client_id: `attachment-${readyAttachment.taskId}`,
+      provider: 'files',
+      resource_type: 'document',
+      resource_id: readyAttachment.documentId,
+      label: readyAttachment.name,
+    } : null;
+    const messageSources = attachmentSource
+      ? [...selectedSources.filter((source) => source.resource_id !== attachmentSource.resource_id), attachmentSource]
+      : selectedSources;
     setInputValue('');
     shouldScrollToBottomRef.current = true;
 
@@ -405,18 +462,29 @@ export const Chat: React.FC = () => {
         size: formatBytes(readyAttachment.size),
         type: readyAttachment.type,
       }] : undefined,
+      sources: messageSources.length ? messageSources : undefined,
       agentId: selectedAgentId || undefined,
       modelLabel: selectedAgent?.name ?? 'Default agent',
     }));
 
-    dispatch(sendMessage({
-      messageContent,
-      chatMode,
-      agentId: selectedAgentId || undefined,
-      modelLabel: selectedAgent?.name ?? 'Default agent',
-    }));
-
-    if (readyAttachment) clearAttachment();
+    try {
+      await dispatch(sendMessage({
+        messageContent,
+        chatMode,
+        agentId: selectedAgentId || undefined,
+        modelLabel: selectedAgent?.name ?? 'Default agent',
+        sources: messageSources.length ? messageSources : undefined,
+      })).unwrap();
+      setSelectedSources([]);
+      setSourceError(null);
+      if (readyAttachment) clearAttachment();
+    } catch (error) {
+      const message = typeof error === 'string'
+        ? error
+        : 'Message failed. Your selected sources are preserved for retry.';
+      setSourceError(message);
+      void refreshSourceCapabilities();
+    }
   };
 
   const handleUsePrompt = (prompt: string): void => {
@@ -443,6 +511,8 @@ export const Chat: React.FC = () => {
       modelLabel: selectedAgent?.name ?? 'Default agent',
     }));
     setInputValue('');
+    setSelectedSources([]);
+    setSourceError(null);
     setOpenConversationMenuId(null);
     window.setTimeout(() => inputRef.current?.focus(), 0);
   };
@@ -455,6 +525,7 @@ export const Chat: React.FC = () => {
       chatMode,
       agentId: selectedAgentId || undefined,
       modelLabel: selectedAgent?.name ?? activeConversation?.modelLabel ?? 'Default agent',
+      sources: lastUserMessage.sources,
     }));
   };
 
@@ -464,6 +535,8 @@ export const Chat: React.FC = () => {
     previousScrollTopRef.current = 0;
     dispatch(selectChatConversation(conversationId));
     dispatch(fetchHistory({ mode: 'initial', conversationLocalId: conversationId }));
+    setSelectedSources([]);
+    setSourceError(null);
     setOpenConversationMenuId(null);
     setRenameDialog(null);
     setDeleteDialog(null);
@@ -513,7 +586,9 @@ export const Chat: React.FC = () => {
     ? `Using ${attachment.name} · Indexed`
     : attachment
       ? `Indexing ${attachment.name}...`
-      : 'No source selected';
+      : selectedSources.length > 0
+        ? `${selectedSources.length} source${selectedSources.length === 1 ? '' : 's'} selected`
+        : 'No source selected';
   return (
     <div className="flex h-full min-h-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.10),transparent_28%),linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.16),transparent_30%),linear-gradient(180deg,#020617_0%,#0f172a_100%)]">
       <aside className={`hidden min-h-0 shrink-0 flex-col border-r border-white/70 bg-white/72 backdrop-blur-xl transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-950/72 lg:flex ${isRecentConversationsOpen ? 'w-64' : 'w-14'}`}>
@@ -715,6 +790,16 @@ export const Chat: React.FC = () => {
                 </div>
 
                 <div className="w-full max-w-3xl rounded-2xl border border-white/80 bg-white/92 p-2.5 text-left shadow-[0_22px_70px_rgba(15,23,42,0.11)] backdrop-blur-xl transition-all focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-500/35 dark:border-slate-800 dark:bg-slate-950/90">
+                  <IntegratedMentionMenu
+                    token={token}
+                    inputValue={inputValue}
+                    capabilities={sourceCapabilities}
+                    onConsumeMention={handleConsumeMention}
+                    onSelect={handleSelectSource}
+                    onError={setSourceError}
+                  />
+                  <ChatSourceChips sources={selectedSources} onRemove={handleRemoveSource} />
+                  {sourceError && <p className="mb-2 px-1 text-xs font-semibold text-red-600 dark:text-red-300">{sourceError}</p>}
                   {attachment && (
                     <ChatAttachmentChip attachment={attachment} onRemove={clearAttachment} />
                   )}
@@ -863,6 +948,16 @@ export const Chat: React.FC = () => {
             )}
 
             <div className={`rounded-xl border border-white/80 bg-white/90 p-2 shadow-[0_18px_54px_rgba(88,28,135,0.16)] backdrop-blur-xl transition-all duration-300 focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-500/40 dark:border-slate-800 dark:bg-slate-950/90 ${isLoading ? 'pointer-events-none opacity-75' : ''}`}>
+              <IntegratedMentionMenu
+                token={token}
+                inputValue={inputValue}
+                capabilities={sourceCapabilities}
+                onConsumeMention={handleConsumeMention}
+                onSelect={handleSelectSource}
+                onError={setSourceError}
+              />
+              <ChatSourceChips sources={selectedSources} onRemove={handleRemoveSource} />
+              {sourceError && <p className="mb-2 px-1 text-xs font-semibold text-red-600 dark:text-red-300">{sourceError}</p>}
               <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-200/80 px-1.5 pb-2 dark:border-slate-800">
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                   <div ref={agentPickerRef} className="relative min-w-[130px]">

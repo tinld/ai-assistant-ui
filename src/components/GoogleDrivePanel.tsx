@@ -43,6 +43,7 @@ export const GoogleDrivePanel: React.FC<GoogleDrivePanelProps> = ({ token, onFil
 
   const statusLabel = useMemo(() => {
     if (!status?.configured) return 'Setup needed';
+    if (status.reconnectRequired) return 'Connection expired';
     if (status.connected) return 'Connected';
     return 'Not connected';
   }, [status]);
@@ -114,7 +115,18 @@ export const GoogleDrivePanel: React.FC<GoogleDrivePanelProps> = ({ token, onFil
       setFiles((current) => (mode === 'append' ? [...current, ...response.files] : response.files));
       setNextPageToken(response.nextPageToken ?? null);
     } catch (err) {
-      setError(getErrorMessage(err, 'Unable to list Google Drive files.'));
+      const message = getErrorMessage(err, 'Unable to list Google Drive files.');
+      setError(message);
+      if (err instanceof ApiError && err.status === 424) {
+        setStatus((current) => current ? {
+          ...current,
+          connected: false,
+          reconnectRequired: true,
+          connectionStatus: 'expired',
+        } : current);
+        setFiles([]);
+        setNextPageToken(null);
+      }
     } finally {
       setIsLoadingFiles(false);
     }
@@ -177,7 +189,7 @@ export const GoogleDrivePanel: React.FC<GoogleDrivePanelProps> = ({ token, onFil
               disabled={isLoadingStatus || status?.configured === false}
               className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-700"
             >
-              Connect Drive
+              {status?.reconnectRequired ? 'Reconnect Drive' : 'Connect Drive'}
             </button>
           )}
         </div>
@@ -192,6 +204,12 @@ export const GoogleDrivePanel: React.FC<GoogleDrivePanelProps> = ({ token, onFil
       {status?.configured === false && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
           Add Google OAuth credentials on the backend before users can connect Drive.
+        </div>
+      )}
+
+      {status?.reconnectRequired && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+          Your Google Drive connection expired or was revoked. Reconnect Drive to browse, sync, or reference Drive files in chat.
         </div>
       )}
 

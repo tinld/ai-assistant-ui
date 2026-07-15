@@ -168,21 +168,15 @@ export const fetchHistory = createAsyncThunk(
 
     try {
       if (conversation && !conversation.backendConversationId) {
-        const shouldUseLocalOnly = Boolean(input.conversationLocalId)
-          || loadMode === 'older'
-          || conversation.messages.length > 0;
-
-        if (shouldUseLocalOnly) {
-          return {
-            success: true,
-            conversation_id: undefined,
-            history: conversation.messages,
-            hasMore: false,
-            nextCursor: null,
-            loadMode,
-            localConversationId,
-          };
-        }
+        return {
+          success: true,
+          conversation_id: undefined,
+          history: conversation.messages,
+          hasMore: false,
+          nextCursor: null,
+          loadMode,
+          localConversationId,
+        };
       }
 
       const query = new URLSearchParams({ limit: String(CHAT_HISTORY_PAGE_SIZE) });
@@ -216,6 +210,7 @@ export const sendMessage = createAsyncThunk(
     const agentId = typeof input === 'string' ? undefined : input.agentId;
     const modelLabel = typeof input === 'string' ? undefined : input.modelLabel;
     const chatMode = typeof input === 'string' ? undefined : input.chatMode;
+    const sources = typeof input === 'string' ? undefined : input.sources;
     const activeConversation = getActiveConversation(state.chat);
     const conversationId = typeof input === 'string'
       ? activeConversation?.backendConversationId
@@ -237,6 +232,7 @@ export const sendMessage = createAsyncThunk(
       ...(conversationId ? { conversation_id: conversationId } : {}),
       ...(clientConversationId ? { client_conversation_id: clientConversationId } : {}),
       ...(clientHistory?.length ? { client_history: clientHistory.slice(-20) } : {}),
+      ...(sources?.length ? { sources } : {}),
     };
 
     try {

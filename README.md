@@ -16,6 +16,10 @@ A modern React application for an AI concierge experience, built with Vite, Type
 - **State Management**: Ready for Redux integration.
 - **Icons**: Integrates Material Symbols Outlined.
 
+## Product documentation
+
+- [Chat integrated mentions](docs/chat-integrated-mentions.md): behavior and API contracts for `@Drive`, `@Files`, and `@Gmail` in chat.
+
 ## Tech Stack
 
 - [React 18](https://react.dev/)

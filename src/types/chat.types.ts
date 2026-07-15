@@ -1,10 +1,13 @@
+import type { ChatSourceReference, ChatSourceSelection } from './chat-source.types';
+
 export interface Message {
   id?: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp?: string;
   files?: AttachedFile[];
-  references?: string[];
+  sources?: ChatSourceSelection[];
+  references?: Array<string | ChatSourceReference>;
   type?: string;
 }
 
@@ -68,4 +71,5 @@ export interface SendMessageInput {
   chatMode?: string;
   agentId?: string;
   modelLabel?: string;
+  sources?: ChatSourceSelection[];
 }

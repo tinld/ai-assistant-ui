@@ -2,6 +2,8 @@ export interface GoogleDriveStatus {
   success: boolean;
   configured: boolean;
   connected: boolean;
+  reconnectRequired?: boolean;
+  connectionStatus?: 'connected' | 'expired' | 'disconnected';
   email?: string | null;
   connectedAt?: string | null;
   lastSyncedAt?: string | null;
