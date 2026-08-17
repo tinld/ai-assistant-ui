@@ -51,8 +51,12 @@ import {
 import { CHAT_ATTACHMENT_ACCEPT, CHAT_ATTACHMENT_MAX_SIZE_LABEL } from '../constants/file.constants';
 import { APP_ROUTES } from '../constants/route.constants';
 import { ChatAttachmentChip } from '../components/ChatAttachmentChip';
+import { ChatContextChipList } from '../components/ChatContextChipList';
+import { ChatContextPicker } from '../components/ChatContextPicker';
+import { ChatContextTagMenu } from '../components/ChatContextTagMenu';
 import { MarkdownMessage } from '../components/MarkdownMessage';
 import { useChatAttachment } from '../hooks/useChatAttachment';
+import { useChatContextTags } from '../hooks/useChatContextTags';
 import { api } from '../services/api';
 import { agentApi } from '../services/agentApi';
 import type { AgentProfile } from '../types/agent.types';
@@ -182,6 +186,14 @@ const UserMessage = memo(function UserMessage({ message, fallbackInitial }: User
               <span className="shrink-0 opacity-70">{file.size}</span>
             </div>
           ))}
+          {message.contextChips?.map((chip) => (
+            <div key={chip.id} className="mt-2 flex items-center gap-2 rounded-lg bg-white/10 px-2.5 py-2 text-xs dark:bg-slate-900/10">
+              <Database className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate font-semibold">
+                {chip.tag} {chip.label}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </article>
@@ -217,6 +229,28 @@ export const Chat: React.FC = () => {
   } = useChatAttachment(token);
 
   const [inputValue, setInputValue] = useState('');
+  const {
+    activeSource,
+    clearContextChips,
+    contextChips,
+    handleTagKeyDown,
+    highlightedSourceIndex,
+    isPickerLoading,
+    isTagMenuOpen,
+    pickerError,
+    removeContextChip,
+    results: contextResults,
+    selectResult,
+    selectSource,
+    setActiveSource,
+    setSourceQuery,
+    sourceQuery,
+    visibleSources,
+  } = useChatContextTags({
+    inputValue,
+    setInputValue,
+    token,
+  });
   const [chatMode, setChatMode] = useState('auto');
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
@@ -247,7 +281,7 @@ export const Chat: React.FC = () => {
     () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
     [activeConversationId, conversations]
   );
-  const messages = activeConversation?.messages ?? [];
+  const messages = useMemo(() => activeConversation?.messages ?? [], [activeConversation]);
   const lastUserMessage = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       if (messages[index]?.role === 'user') {
@@ -402,6 +436,7 @@ export const Chat: React.FC = () => {
         size: formatBytes(readyAttachment.size),
         type: readyAttachment.type,
       }] : undefined,
+      contextChips: contextChips.length ? contextChips : undefined,
       agentId: selectedAgentId || undefined,
       modelLabel: selectedAgent?.name ?? 'Default agent',
     }));
@@ -409,11 +444,13 @@ export const Chat: React.FC = () => {
     dispatch(sendMessage({
       messageContent,
       chatMode,
+      contextChips: contextChips.length ? contextChips : undefined,
       agentId: selectedAgentId || undefined,
       modelLabel: selectedAgent?.name ?? 'Default agent',
     }));
 
     if (readyAttachment) clearAttachment();
+    if (contextChips.length) clearContextChips();
   };
 
   const handleUsePrompt = (prompt: string): void => {
@@ -422,6 +459,8 @@ export const Chat: React.FC = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (handleTagKeyDown(e)) return;
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -500,9 +539,21 @@ export const Chat: React.FC = () => {
     ? `Using ${attachment.name} · Indexed`
     : attachment
       ? `Indexing ${attachment.name}...`
-      : 'No source selected';
+      : contextChips.length
+        ? `${contextChips.length} tagged source${contextChips.length === 1 ? '' : 's'}`
+        : 'No source selected';
   return (
     <div className="flex h-full min-h-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.10),transparent_28%),linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.16),transparent_30%),linear-gradient(180deg,#020617_0%,#0f172a_100%)]">
+      <ChatContextPicker
+        source={activeSource}
+        query={sourceQuery}
+        results={contextResults}
+        isLoading={isPickerLoading}
+        error={pickerError}
+        onQueryChange={setSourceQuery}
+        onClose={() => setActiveSource(null)}
+        onSelectResult={selectResult}
+      />
       <aside className={`hidden min-h-0 shrink-0 flex-col border-r border-white/70 bg-white/72 backdrop-blur-xl transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-950/72 lg:flex ${isRecentConversationsOpen ? 'w-64' : 'w-14'}`}>
         <div className={`flex h-14 shrink-0 items-center border-b border-slate-200/70 px-3 dark:border-slate-800 ${isRecentConversationsOpen ? 'justify-between' : 'justify-center'}`}>
           {isRecentConversationsOpen && (
@@ -737,6 +788,14 @@ export const Chat: React.FC = () => {
                   {attachment && (
                     <ChatAttachmentChip attachment={attachment} onRemove={clearAttachment} />
                   )}
+                  <ChatContextChipList chips={contextChips} onRemove={removeContextChip} />
+                  {isTagMenuOpen && (
+                    <ChatContextTagMenu
+                      sources={visibleSources}
+                      highlightedIndex={highlightedSourceIndex}
+                      onSelect={selectSource}
+                    />
+                  )}
 
                   <div className="flex items-start gap-2">
                     <input
@@ -880,6 +939,13 @@ export const Chat: React.FC = () => {
                 </div>
               </div>
             )}
+            {isTagMenuOpen && (
+              <ChatContextTagMenu
+                sources={visibleSources}
+                highlightedIndex={highlightedSourceIndex}
+                onSelect={selectSource}
+              />
+            )}
 
             <div className={`rounded-xl border border-white/80 bg-white/90 p-2 shadow-[0_18px_54px_rgba(88,28,135,0.16)] backdrop-blur-xl transition-all duration-300 focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-500/40 dark:border-slate-800 dark:bg-slate-950/90 ${isLoading ? 'pointer-events-none opacity-75' : ''}`}>
               <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-200/80 px-1.5 pb-2 dark:border-slate-800">
@@ -1021,6 +1087,7 @@ export const Chat: React.FC = () => {
               {attachment && (
                 <ChatAttachmentChip attachment={attachment} onRemove={clearAttachment} />
               )}
+              <ChatContextChipList chips={contextChips} onRemove={removeContextChip} />
 
               <div className="flex items-center gap-1 pt-1">
                 <input

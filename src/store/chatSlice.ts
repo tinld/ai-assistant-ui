@@ -216,6 +216,7 @@ export const sendMessage = createAsyncThunk(
     const agentId = typeof input === 'string' ? undefined : input.agentId;
     const modelLabel = typeof input === 'string' ? undefined : input.modelLabel;
     const chatMode = typeof input === 'string' ? undefined : input.chatMode;
+    const contextChips = typeof input === 'string' ? undefined : input.contextChips;
     const activeConversation = getActiveConversation(state.chat);
     const conversationId = typeof input === 'string'
       ? activeConversation?.backendConversationId
@@ -234,6 +235,7 @@ export const sendMessage = createAsyncThunk(
       message: messageContent,
       ...(agentId ? { agent_id: agentId } : {}),
       ...(chatMode ? { chat_mode: chatMode } : {}),
+      ...(contextChips?.length ? { context_chips: contextChips } : {}),
       ...(conversationId ? { conversation_id: conversationId } : {}),
       ...(clientConversationId ? { client_conversation_id: clientConversationId } : {}),
       ...(clientHistory?.length ? { client_history: clientHistory.slice(-20) } : {}),

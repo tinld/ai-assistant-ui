@@ -1,9 +1,12 @@
+import type { ChatContextChip } from './chat-context.types';
+
 export interface Message {
   id?: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp?: string;
   files?: AttachedFile[];
+  contextChips?: ChatContextChip[];
   references?: string[];
   type?: string;
 }
@@ -62,6 +65,7 @@ export interface ChatHistoryResponse {
 
 export interface SendMessageInput {
   messageContent: string;
+  contextChips?: ChatContextChip[];
   conversationId?: string;
   clientConversationId?: string;
   clientHistory?: Message[];
